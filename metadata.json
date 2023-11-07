@@ -1,0 +1,9 @@
+{
+  "name": "Tempomate",
+  "description": "Time Tracker for Tempo",
+  "uuid": "tempomate@dmfs.org",
+  "shell-version": [
+    "44"
+  ],
+  "settings-schema": "org.gnome.shell.extensions.tempomate.dmfs.org"
+}

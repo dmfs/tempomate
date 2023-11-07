@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+	<schema id="org.gnome.shell.extensions.tempomate.dmfs.org" path="/org/gnome/shell/extensions/tempomate.dmfs.org/">
+		<key name="host" type="s">
+			<default>"https://jira.example.com"</default>
+			<summary>Jira base URL</summary>
+			<description>The base URL of the Jira server.</description>
+		</key>
+		<key name="username" type="s">
+			<default>""</default>
+			<summary>Username</summary>
+			<description>The username of worklog entries.</description>
+		</key>
+		<key name="token" type="s">
+			<default>""</default>
+			<summary>API token</summary>
+			<description>A valid API token</description>
+		</key>
+		<key name="jqls" type="as">
+			<default>[
+				'{
+				"name": "My open Issues",
+				"jql": "assignee = currentUser() AND resolution = Unresolved"
+				}']
+			</default>
+			<summary>The menu queries</summary>
+			<description>The queries to show in the panel menu.</description>
+		</key>
+	</schema>
+</schemalist>
