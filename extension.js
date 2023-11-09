@@ -50,11 +50,21 @@ const Indicator = GObject.registerClass(
             this.issues = {};
             this.settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.tempomate.dmfs.org');
             this.queries = []
-            this._refresh();
+            this._settingsChangedId = this.settings.connect('changed', Lang.bind(this, this._settingsChanged));
+            this._settingsChanged();
+            this._refresh_label();
+        }
+
+        _settingsChanged() {
+            this.default_duration = this.settings.get_int("default-duration") * 60;
+            this.queries = this.settings.get_strv('jqls').map((s) => JSON.parse(s));
+            this.host = this.settings.get_string('host');
+            this.username = this.settings.get_string('username');
+            this.token = this.settings.get_string('token');
+            this._refreshFilters();
         }
 
         updateUI() {
-
             this.menu.removeAll();
 
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(_('Recent Issues')));
@@ -81,7 +91,7 @@ const Indicator = GObject.registerClass(
             const item = new IssueMenuItem(issue.key, issue.fields.summary);
             item.connect('activate', () => {
                 _this.add_recent_issue(issue);
-                _this.end_time = new Date(new Date().getTime() + 900000);
+                _this.end_time = new Date(new Date().getTime() + this.default_duration * 1000);
 
                 if (_this.current_issue !== issue.key) {
                     if (_this.current_issue) {
@@ -99,7 +109,7 @@ const Indicator = GObject.registerClass(
                 if (_this.stop_work_timeout) {
                     Mainloop.source_remove(_this.stop_work_timeout);
                 }
-                _this.stop_work_timeout = Mainloop.timeout_add_seconds(900, Lang.bind(_this, _this.stop_work));
+                _this.stop_work_timeout = Mainloop.timeout_add_seconds(this.default_duration, Lang.bind(_this, _this.stop_work));
             });
             return item;
         }
@@ -142,13 +152,9 @@ const Indicator = GObject.registerClass(
             }
         }
 
-        _refresh() {
-            this.queries = this.settings.get_strv('jqls').map((s)=> JSON.parse(s))
-            for (const q in this.queries) {
-                this._getRequest(this.queries[q].name, this.queries[q].jql);
-            }
+        _refresh_label() {
             this._removeTimeout();
-            this._timeout = Mainloop.timeout_add_seconds(30, Lang.bind(this, this._refresh));
+            this._timeout = Mainloop.timeout_add_seconds(60, Lang.bind(this, this._refresh_label));
             this.update_label();
             return true;
         }
@@ -159,6 +165,24 @@ const Indicator = GObject.registerClass(
                 this._timeout = null;
             }
         }
+
+
+        _refreshFilters() {
+            for (const q in this.queries) {
+                this._getRequest(this.queries[q].name, this.queries[q].jql);
+            }
+            this._removeFilterTimeout();
+            this._filter_timeout = Mainloop.timeout_add_seconds(600, Lang.bind(this, this._refreshFilters));
+            return true;
+        }
+
+        _removeFilterTimeout() {
+            if (this._filter_timeout) {
+                Mainloop.source_remove(this._filter_timeout);
+                this._filter_timeout = null;
+            }
+        }
+
 
         destroy() {
             if (this.stop_work_timeout) {
@@ -184,21 +208,7 @@ const Indicator = GObject.registerClass(
             }
 
             this.notification = new MessageTray.Notification(this.notification_source, msg, details);
-/*
-            this.notification.addAction("15m", function
-                    (param) {
-                    print("callback called with " + param);
-                }
-            );
 
-            this.notification.addAction("1h", function
-                    (param) {
-
-                    print("callback called with " + param);
-                }
-            );
-
- */
             this.notification.setTransient(false);
             this.notification.setResident(true);
 
@@ -215,12 +225,12 @@ const Indicator = GObject.registerClass(
 
         _getRequest(key, query) {
 
-            let URL = this.settings.get_string('host') + '/rest/api/2/search?jql=' + encodeURI(query) + '&maxResults=30&fields=id,key,summary';
+            let URL = this.host + '/rest/api/2/search?jql=' + encodeURI(query) + '&maxResults=30&fields=id,key,summary';
 
             // Create your message
             let _httpSession = new Soup.Session();
             let message = Soup.Message.new('GET', URL);
-            message.request_headers.append("Authorization", "Bearer " + this.settings.get_string('token'));
+            message.request_headers.append("Authorization", "Bearer " + this.token);
 
             const _this = this;
             // Send the message and retrieve the data
@@ -247,7 +257,7 @@ const Indicator = GObject.registerClass(
         */
         _log_time(issue, start, end) {
             let method = "POST";
-            let URL = this.settings.get_string('host') + '/rest/tempo-timesheets/4/worklogs';
+            let URL = this.host + '/rest/tempo-timesheets/4/worklogs';
             if (this.current_id && this.current_issue === issue) {
                 URL = URL + "/" + this.current_id;
                 method = "PUT";
@@ -266,7 +276,7 @@ const Indicator = GObject.registerClass(
                 // "remainingEstimate": 3600,
                 "started": start_string,
                 "timeSpentSeconds": Math.round((end.getTime() - start.getTime()) / 1000),
-                "worker": this.settings.get_string('username')
+                "worker": this.username
             };
 
             print("logging on " + URL + " " + JSON.stringify(payload));
@@ -275,7 +285,7 @@ const Indicator = GObject.registerClass(
 
             let _httpSession = new Soup.Session();
             let message = Soup.Message.new(method, URL);
-            message.request_headers.append("Authorization", "Bearer " + this.settings.get_string('token'));
+            message.request_headers.append("Authorization", "Bearer " + this.token);
             message.set_request_body_from_bytes("application/json", utf8Encode.encode(JSON.stringify(payload)));
 
             const _this = this;
