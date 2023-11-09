@@ -26,5 +26,10 @@
 			<summary>The menu queries</summary>
 			<description>The queries to show in the panel menu.</description>
 		</key>
+		<key name="default-duration" type="i">
+			<default>15</default>
+			<summary>Default duration</summary>
+			<description>The default duration of a work-log in minutes</description>
+		</key>
 	</schema>
 </schemalist>
