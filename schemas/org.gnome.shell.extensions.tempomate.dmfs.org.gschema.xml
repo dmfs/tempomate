@@ -31,5 +31,11 @@
 			<summary>Default duration</summary>
 			<description>The default duration of a work-log in minutes</description>
 		</key>
+		<key name="recent-issues" type="as">
+			<default>[]
+			</default>
+			<summary>Recent issues</summary>
+			<description>The list of recent issues</description>
+		</key>
 	</schema>
 </schemalist>
