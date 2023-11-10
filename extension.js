@@ -46,9 +46,9 @@ const Indicator = GObject.registerClass(
             });
             this.add_child(this.label);
             this.setMenu(new PopupMenu.PopupMenu(this, 0.0, St.Side.TOP, 0));
-            this.recent_issues = [];
             this.issues = {};
             this.settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.tempomate.dmfs.org');
+            this.recent_issues = this.settings.get_strv("recent-issues").map((i) => JSON.parse(i));
             this.queries = []
             this._settingsChangedId = this.settings.connect('changed', Lang.bind(this, this._settingsChanged));
             this._settingsChanged();
@@ -185,6 +185,7 @@ const Indicator = GObject.registerClass(
 
 
         destroy() {
+            this._save_state();
             if (this.stop_work_timeout) {
                 Mainloop.source_remove(this.stop_work_timeout);
             }
@@ -309,6 +310,10 @@ const Indicator = GObject.registerClass(
                 print(_this.current_id);
                 _this.current_issue = issue;
             });
+        }
+
+        _save_state() {
+            this.settings.set_strv("recent-issues", this.recent_issues.map((ri) => JSON.stringify(ri)));
         }
     });
 
