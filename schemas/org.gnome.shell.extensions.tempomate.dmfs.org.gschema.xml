@@ -31,6 +31,11 @@
 			<summary>Default duration</summary>
 			<description>The default duration of a work-log in minutes</description>
 		</key>
+		<key name="issue-cache" type="s">
+			<default>"{}"</default>
+			<summary>Issue cache</summary>
+			<description>Serialized array of the most recent issues.</description>
+		</key>
 		<key name="recent-issues" type="as">
 			<default>[]
 			</default>
