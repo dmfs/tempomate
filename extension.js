@@ -46,13 +46,18 @@ const Indicator = GObject.registerClass(
             });
             this.add_child(this.label);
             this.setMenu(new PopupMenu.PopupMenu(this, 0.0, St.Side.TOP, 0));
-            this.issues = {};
             this.settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.tempomate.dmfs.org');
-            this.recent_issues = this.settings.get_strv("recent-issues").map((i) => JSON.parse(i));
-            this.queries = []
+            this._restore()
             this._settingsChangedId = this.settings.connect('changed', Lang.bind(this, this._settingsChanged));
             this._settingsChanged();
             this._refresh_label();
+            this.updateUI(this.menu, true);
+            this.menu.connect("open-state-changed", Lang.bind(this, this.updateUI))
+        }
+
+        _restore() {
+            this.issues = JSON.parse(this.settings.get_string("issue-cache"))
+            this.recent_issues = this.settings.get_strv("recent-issues").map((i) => JSON.parse(i));
         }
 
         _settingsChanged() {
@@ -64,14 +69,19 @@ const Indicator = GObject.registerClass(
             this._refreshFilters();
         }
 
-        updateUI() {
+        updateUI(menu, opened) {
+            if (!opened) {
+                return;
+            }
             this.menu.removeAll();
 
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(_('Recent Issues')));
 
+            const recent_issues_menu = new PopupMenu.PopupMenuSection()
             for (const issue in this.recent_issues) {
-                this.menu.addMenuItem(this.generateMenuItem(this.recent_issues[issue]));
+                recent_issues_menu.addMenuItem(this.generateMenuItem(this.recent_issues[issue]));
             }
+            this.menu.addMenuItem(recent_issues_menu);
 
             this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(_('Queries')));
 
@@ -121,8 +131,6 @@ const Indicator = GObject.registerClass(
             if (this.recent_issues.unshift(issue) > 5) {
                 this.recent_issues.length = 5;
             }
-            // update UI asynchronously
-            Mainloop.timeout_add_seconds(0.1, Lang.bind(this, this.updateUI));
         }
 
         stop_work() {
@@ -166,13 +174,12 @@ const Indicator = GObject.registerClass(
             }
         }
 
-
         _refreshFilters() {
             for (const q in this.queries) {
                 this._getRequest(this.queries[q].name, this.queries[q].jql);
             }
             this._removeFilterTimeout();
-            this._filter_timeout = Mainloop.timeout_add_seconds(600, Lang.bind(this, this._refreshFilters));
+            this._filter_timeout = Mainloop.timeout_add_seconds(900, Lang.bind(this, this._refreshFilters));
             return true;
         }
 
@@ -242,14 +249,12 @@ const Indicator = GObject.registerClass(
                     const bytes = _httpSession.send_and_read_finish(response_message);
                     const decoder = new TextDecoder();
                     body = decoder.decode(bytes.get_data());
+
+                    let json = JSON.parse(body);
+                    _this.issues[key] = json.issues;
                 } catch (e) {
                     log(`Could not parse soup response body ${e}`);
                 }
-
-                print(body);
-                let json = JSON.parse(body);
-                _this.issues[key] = json.issues;
-                _this.updateUI();
             });
         }
 
@@ -268,19 +273,14 @@ const Indicator = GObject.registerClass(
             var start_string = start.toJSON().replace('T', ' ').replace("Z", "");
 
             let payload = {
-                //  "attributes": { },
                 "billableSeconds": Math.round((end.getTime() - start.getTime()) / 1000),
-                // "comment": "This is my comment.",
-                // "endDate": "2023-11-04",
                 "includeNonWorkingDays": false,
                 "originTaskId": issue,
-                // "remainingEstimate": 3600,
                 "started": start_string,
                 "timeSpentSeconds": Math.round((end.getTime() - start.getTime()) / 1000),
                 "worker": this.username
             };
 
-            print("logging on " + URL + " " + JSON.stringify(payload));
             let utf8Encode = new TextEncoder();
 
 
@@ -298,22 +298,21 @@ const Indicator = GObject.registerClass(
                     const bytes = _httpSession.send_and_read_finish(response_message);
                     const decoder = new TextDecoder();
                     body = decoder.decode(bytes.get_data());
+
+                    const json = JSON.parse(body);
+                    if (Array.isArray(json)) {
+                        _this.current_id = json[0].tempoWorklogId;
+                    }
+                    _this.current_issue = issue;
                 } catch (e) {
                     log(`Could not parse soup response body ${e}`)
                 }
-
-                print(body);
-                const json = JSON.parse(body);
-                if (Array.isArray(json)) {
-                    _this.current_id = json[0].tempoWorklogId;
-                }
-                print(_this.current_id);
-                _this.current_issue = issue;
             });
         }
 
         _save_state() {
             this.settings.set_strv("recent-issues", this.recent_issues.map((ri) => JSON.stringify(ri)));
+            this.settings.set_string("issue-cache", JSON.stringify(this.issues));
         }
     });
 
