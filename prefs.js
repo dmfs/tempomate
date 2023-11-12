@@ -4,6 +4,7 @@ const Me = ExtensionUtils.getCurrentExtension();
 const {ConnectionSettingsPage} = Me.imports.preferences.connection_settings_page;
 const {FilterSettingsPage} = Me.imports.preferences.filter_settings_page;
 const {TrackingSettingsPage} = Me.imports.preferences.tracking_settings_page;
+const {NotificationsSettingsPage} = Me.imports.preferences.notifications_settings_page;
 
 
 /** */
@@ -18,4 +19,5 @@ function fillPreferencesWindow(window) {
     window.add(new ConnectionSettingsPage());
     window.add(new FilterSettingsPage());
     window.add(new TrackingSettingsPage());
+    window.add(new NotificationsSettingsPage());
 }

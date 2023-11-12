@@ -17,7 +17,9 @@ var TrackingSettingsPage = GObject.registerClass({
 
             const group = new Adw.PreferencesGroup({title: "Defaults"});
 
-            const duration = new Gtk.SpinButton();
+            const duration = new Gtk.SpinButton({
+                valign: Gtk.Align.CENTER
+            });
             duration.set_range(5, 480);
             duration.set_value(settings.get_int("default-duration"));
             duration.set_increments(5, 5);

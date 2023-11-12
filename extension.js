@@ -19,9 +19,8 @@
 
 const GETTEXT_DOMAIN = 'tempomate';
 
-const {GObject, St} = imports.gi;
+const {GObject, St, Soup} = imports.gi;
 
-const Gio = imports.gi.Gio;
 const Lang = imports.lang;
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
@@ -30,7 +29,6 @@ const PanelMenu = imports.ui.panelMenu;
 const PopupMenu = imports.ui.popupMenu;
 const MessageTray = imports.ui.messageTray;
 const Mainloop = imports.mainloop;
-const Soup = imports.gi.Soup;
 const {IssueMenuItem} = Me.imports.ui.menuitem;
 
 const {TempomateService} = Me.imports.dbus.tempomate_service;
@@ -73,7 +71,15 @@ const Indicator = GObject.registerClass(
             this.host = this.settings.get_string('host');
             this.username = this.settings.get_string('username');
             this.token = this.settings.get_string('token');
-            this.client = new JiraApi2Client(this.host, this.token)
+            this.client = new JiraApi2Client(this.host, this.token);
+
+            const old_nag_interval = this.nag_interval;
+            this.nag_interval = this.settings.get_int("nag-notification-interval");
+            const old_nag_notifications = this.nag_notifications;
+            this.nag_notifications = this.settings.get_boolean("nag-notifications")
+            if (!this.current_issue && (old_nag_interval !== this.nag_interval || old_nag_notifications !== this.nag_notifications)) {
+                this.notify_idle();
+            }
             this._refreshFilters();
         }
 
@@ -120,9 +126,9 @@ const Indicator = GObject.registerClass(
             if (!issue || !issue.key) {
                 return
             }
-            if (this.idle_timeout) {
-                Mainloop.source_remove(this.idle_timeout);
-                this.idle_timeout = null;
+            if (this.nag_timeout) {
+                Mainloop.source_remove(this.nag_timeout);
+                this.nag_timeout = null;
             }
 
             this.add_recent_issue(issue);
@@ -223,8 +229,8 @@ const Indicator = GObject.registerClass(
             if (this.stop_work_timeout) {
                 Mainloop.source_remove(this.stop_work_timeout);
             }
-            if (this.idle_timeout) {
-                Mainloop.source_remove(this.idle_timeout);
+            if (this.nag_timeout) {
+                Mainloop.source_remove(this.nag_timeout);
             }
             this._removeTimeout();
             this.dbus_service.destroy();
@@ -251,15 +257,16 @@ const Indicator = GObject.registerClass(
             }));
         }
 
-
         notify_idle() {
-            Main.notify("⚠️ Your work is not tracked ⚠️")
-            if (this.idle_timeout) {
-                Mainloop.source_remove(this.idle_timeout);
+            if (this.nag_timeout) {
+                Mainloop.source_remove(this.nag_timeout);
             }
-            this.idle_timeout = Mainloop.timeout_add_seconds(60, Lang.bind(this, this.notify_idle));
-        }
+            if (this.nag_notifications) {
+                Main.notify("⚠️ Your work is not tracked ⚠️")
+                this.nag_timeout = Mainloop.timeout_add_seconds(this.nag_interval, Lang.bind(this, this.notify_idle));
 
+            }
+        }
 
         ensure_notification_source() {
             if (!this.notifications_source) {

@@ -42,5 +42,15 @@
 			<summary>Recent issues</summary>
 			<description>The list of recent issues</description>
 		</key>
+		<key name="nag-notifications" type="b">
+			<default>false</default>
+			<summary>Nag Notification</summary>
+			<description>Show a notification when not tracking time</description>
+		</key>
+		<key name="nag-notification-interval" type="i">
+			<default>300</default>
+			<summary>Nag Notification Interval</summary>
+			<description>The interval in seconds at which to show the nag notifications when enabled.</description>
+		</key>
 	</schema>
 </schemalist>

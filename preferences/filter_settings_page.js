@@ -52,7 +52,9 @@ var FilterSettingsPage = GObject.registerClass({
 
             const delete_button_factory = new Gtk.SignalListItemFactory()
             delete_button_factory.connect("setup", (widget, item) => {
-                const b = new Gtk.Button()
+                const b = new Gtk.Button({
+                    valign: Gtk.Align.CENTER
+                })
                 b.set_child(new Adw.ButtonContent({
                     label: "",
                     "icon-name": "list-remove"
