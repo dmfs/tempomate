@@ -57,6 +57,7 @@ const Indicator = GObject.registerClass(
             this.updateUI(this.menu, true);
             this.menu.connect("open-state-changed", Lang.bind(this, this.updateUI))
             this.dbus_service = new TempomateService(Lang.bind(this, this.fetch_and_start_or_continue_work));
+            this.notify_idle();
         }
 
         _restore() {
@@ -119,22 +120,28 @@ const Indicator = GObject.registerClass(
             if (!issue || !issue.key) {
                 return
             }
+            if (this.idle_timeout) {
+                Mainloop.source_remove(this.idle_timeout);
+                this.idle_timeout = null;
+            }
+
             this.add_recent_issue(issue);
             this.end_time = new Date(new Date().getTime() + this.default_duration * 1000);
 
             if (this.current_issue !== issue.key) {
-                this.stop_work();
+                this.stop_work(false);
                 this.start_time = new Date();
-                this.notify('Working on ' + issue.key, "");
+                this.notify_work('Working on ' + issue.key, "");
                 this.label.set_text("Working on " + issue.key);
             } else {
                 this.update_label();
             }
             this._log_time(issue.key, this.start_time, this.end_time);
+            this.current_issue = issue.key;
             if (this.stop_work_timeout) {
                 Mainloop.source_remove(this.stop_work_timeout);
             }
-            this.stop_work_timeout = Mainloop.timeout_add_seconds(this.default_duration, Lang.bind(this, this.stop_work));
+            this.stop_work_timeout = Mainloop.timeout_add_seconds(this.default_duration, Lang.bind(this, () => this.stop_work(true)));
         }
 
         // Add an issue to recent issues and update the UI
@@ -145,12 +152,16 @@ const Indicator = GObject.registerClass(
             }
         }
 
-        stop_work() {
+        stop_work(is_idle) {
             Main.notify('Work on ' + this.current_issue + " done");
+            if (is_idle) {
+                this.notify_idle();
+            }
 
             if (this.notification) {
-                this.notification.destroy(3);
+                const n = this.notification;
                 this.notification = null;
+                n.destroy(3);
             }
             if (this.stop_work_timeout) {
                 Mainloop.source_remove(this.stop_work_timeout);
@@ -207,41 +218,56 @@ const Indicator = GObject.registerClass(
             }
         }
 
-
         destroy() {
             this._save_state();
             if (this.stop_work_timeout) {
                 Mainloop.source_remove(this.stop_work_timeout);
+            }
+            if (this.idle_timeout) {
+                Mainloop.source_remove(this.idle_timeout);
             }
             this._removeTimeout();
             this.dbus_service.destroy();
             super.destroy();
         }
 
-        notify(msg, details) {
+        notify_work(msg, details) {
+            if (this.notification) {
+                this.notification.destroy(3);
+            }
+
+            this.notification = new MessageTray.Notification(this.ensure_notification_source(), msg, details);
+
+            this.notification.setTransient(false);
+            this.notification.setResident(true);
+
+            this.ensure_notification_source().showNotification(this.notification);
+
+            this.notification.connect("destroy", Lang.bind(this, () => {
+                if (this.notification) {
+                    this.notification = null;
+                    this.stop_work(true);
+                }
+            }));
+        }
+
+
+        notify_idle() {
+            Main.notify("⚠️ Your work is not tracked ⚠️")
+            if (this.idle_timeout) {
+                Mainloop.source_remove(this.idle_timeout);
+            }
+            this.idle_timeout = Mainloop.timeout_add_seconds(60, Lang.bind(this, this.notify_idle));
+        }
+
+
+        ensure_notification_source() {
             if (!this.notifications_source) {
                 this.notification_source = new MessageTray.Source("Tempomate", 'system-run-symbolic');
                 Main.messageTray.add(this.notification_source);
                 this.notification_source.connect("destroy", Lang.bind(this, () => this.notification_source = null));
             }
-
-            if (this.notification) {
-                this.notification.destroy(3);
-            }
-
-            this.notification = new MessageTray.Notification(this.notification_source, msg, details);
-
-            this.notification.setTransient(false);
-            this.notification.setResident(true);
-
-            this.notification_source.showNotification(this.notification);
-
-            this.notification.connect("destroy", Lang.bind(this, () => {
-                if (this.notification) {
-                    this.notification = null;
-                    this.stop_work();
-                }
-            }));
+            return this.notification_source;
         }
 
         _getRequest(key, query) {
@@ -293,7 +319,6 @@ const Indicator = GObject.registerClass(
                     if (Array.isArray(json)) {
                         _this.current_id = json[0].tempoWorklogId;
                     }
-                    _this.current_issue = issue;
                 } catch (e) {
                     log(`Could not parse soup response body ${e}`)
                 }
