@@ -33,6 +33,9 @@ const Mainloop = imports.mainloop;
 const Soup = imports.gi.Soup;
 const {IssueMenuItem} = Me.imports.ui.menuitem;
 
+const {TempomateService} = Me.imports.dbus.tempomate_service;
+const {JiraApi2Client} = Me.imports.client.jira_client;
+
 const _ = ExtensionUtils.gettext;
 
 const Indicator = GObject.registerClass(
@@ -53,11 +56,14 @@ const Indicator = GObject.registerClass(
             this._refresh_label();
             this.updateUI(this.menu, true);
             this.menu.connect("open-state-changed", Lang.bind(this, this.updateUI))
+            this.dbus_service = new TempomateService(Lang.bind(this, this.fetch_and_start_or_continue_work));
         }
 
         _restore() {
-            this.issues = JSON.parse(this.settings.get_string("issue-cache"))
-            this.recent_issues = this.settings.get_strv("recent-issues").map((i) => JSON.parse(i));
+            this.issues = JSON.parse(this.settings.get_string("issue-cache"));
+            this.recent_issues = this.settings.get_strv("recent-issues")
+                .map((i) => JSON.parse(i))
+                .filter((issue) => issue.key && issue.fields);
         }
 
         _settingsChanged() {
@@ -66,6 +72,7 @@ const Indicator = GObject.registerClass(
             this.host = this.settings.get_string('host');
             this.username = this.settings.get_string('username');
             this.token = this.settings.get_string('token');
+            this.client = new JiraApi2Client(this.host, this.token)
             this._refreshFilters();
         }
 
@@ -99,31 +106,40 @@ const Indicator = GObject.registerClass(
         generateMenuItem(issue) {
             const _this = this;
             const item = new IssueMenuItem(issue.key, issue.fields.summary);
-            item.connect('activate', () => {
-                _this.add_recent_issue(issue);
-                _this.end_time = new Date(new Date().getTime() + this.default_duration * 1000);
-
-                if (_this.current_issue !== issue.key) {
-                    if (_this.current_issue) {
-                        // stop working on current issue before scheduled time -> update tempo worklog
-                        _this._log_time(_this.current_issue, _this.start_time, new Date());
-                    }
-                    _this.start_time = new Date();
-                    _this.stop_work();
-                    _this.notify('Working on ' + issue.key, "");
-                    _this.label.set_text("Working on " + issue.key);
-                } else {
-                    _this.update_label();
-                }
-                _this._log_time(issue.key, _this.start_time, _this.end_time);
-                if (_this.stop_work_timeout) {
-                    Mainloop.source_remove(_this.stop_work_timeout);
-                }
-                _this.stop_work_timeout = Mainloop.timeout_add_seconds(this.default_duration, Lang.bind(_this, _this.stop_work));
-            });
+            item.connect('activate', Lang.bind(this, () => start_or_continue_work(issue)));
             return item;
         }
 
+        fetch_and_start_or_continue_work(issue) {
+            this.client.issue(issue, Lang.bind(this, this.start_or_continue_work))
+        }
+
+
+        start_or_continue_work(issue) {
+            if (!issue || !issue.key) {
+                return
+            }
+            this.add_recent_issue(issue);
+            this.end_time = new Date(new Date().getTime() + this.default_duration * 1000);
+
+            if (this.current_issue !== issue.key) {
+                if (this.current_issue) {
+                    // stop working on current issue before scheduled time -> update tempo worklog
+                    this._log_time(this.current_issue, this.start_time, new Date());
+                }
+                this.start_time = new Date();
+                this.stop_work();
+                this.notify('Working on ' + issue.key, "");
+                this.label.set_text("Working on " + issue.key);
+            } else {
+                this.update_label();
+            }
+            this._log_time(issue.key, this.start_time, this.end_time);
+            if (this.stop_work_timeout) {
+                Mainloop.source_remove(this.stop_work_timeout);
+            }
+            this.stop_work_timeout = Mainloop.timeout_add_seconds(this.default_duration, Lang.bind(this, this.stop_work));
+        }
 
         // Add an issue to recent issues and update the UI
         add_recent_issue(issue) {
@@ -197,6 +213,7 @@ const Indicator = GObject.registerClass(
                 Mainloop.source_remove(this.stop_work_timeout);
             }
             this._removeTimeout();
+            this.dbus_service.destroy();
             super.destroy();
         }
 
@@ -232,30 +249,7 @@ const Indicator = GObject.registerClass(
         }
 
         _getRequest(key, query) {
-
-            let URL = this.host + '/rest/api/2/search?jql=' + encodeURI(query) + '&maxResults=30&fields=id,key,summary';
-
-            // Create your message
-            let _httpSession = new Soup.Session();
-            let message = Soup.Message.new('GET', URL);
-            message.request_headers.append("Authorization", "Bearer " + this.token);
-
-            const _this = this;
-            // Send the message and retrieve the data
-            _httpSession.send_and_read_async(message, 0, null, (source, response_message) => {
-                let body = ''
-
-                try {
-                    const bytes = _httpSession.send_and_read_finish(response_message);
-                    const decoder = new TextDecoder();
-                    body = decoder.decode(bytes.get_data());
-
-                    let json = JSON.parse(body);
-                    _this.issues[key] = json.issues;
-                } catch (e) {
-                    log(`Could not parse soup response body ${e}`);
-                }
-            });
+            this.client.filter(query, Lang.bind(this, (result) => this.issues[key] = result.issues))
         }
 
         /*

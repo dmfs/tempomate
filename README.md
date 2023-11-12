@@ -4,6 +4,34 @@ A Gnome Shell extension for mindless time tracking in Tempo Timesheets
 
 TODO: readme content
 
+## DBus interface
+
+You can start or extend a work-log by calling an interface via DBus like:
+
+```bash
+gdbus call --session --dest org.gnome.Shell --object-path /org/dmfs/gnome/shell/tempomate --method org.dmfs.gnome.shell.tempomate.log_work ISSUE
+```
+
+With `ISSUE` being the issue ID of the ticket you're working on.
+
+### Example
+
+You can use this interface to create a work-log whenever you check out a branch that contains a Jira issue ID by creating
+a post-checkout hook with the following content
+
+```bash
+#!/bin/bash
+
+BRANCH_CHECKOUT=$3
+
+if [ "${BRANCH_CHECKOUT}" = "1" ] ; then
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        ISSUE=$(echo "${BRANCH}" | grep -P -o '\b[A-Z]+-\d+\b') && \
+                gdbus call --session --dest org.gnome.Shell --object-path /org/dmfs/gnome/shell/tempomate \
+                --method org.dmfs.gnome.shell.tempomate.log_work "${ISSUE}" > /dev/null || true
+fi
+```
+
 # License
 
 Copyright (C) 2023 dmfs GmbH
