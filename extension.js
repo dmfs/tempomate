@@ -106,7 +106,7 @@ const Indicator = GObject.registerClass(
         generateMenuItem(issue) {
             const _this = this;
             const item = new IssueMenuItem(issue.key, issue.fields.summary);
-            item.connect('activate', Lang.bind(this, () => start_or_continue_work(issue)));
+            item.connect('activate', Lang.bind(this, () => this.start_or_continue_work(issue)));
             return item;
         }
 
@@ -123,12 +123,8 @@ const Indicator = GObject.registerClass(
             this.end_time = new Date(new Date().getTime() + this.default_duration * 1000);
 
             if (this.current_issue !== issue.key) {
-                if (this.current_issue) {
-                    // stop working on current issue before scheduled time -> update tempo worklog
-                    this._log_time(this.current_issue, this.start_time, new Date());
-                }
-                this.start_time = new Date();
                 this.stop_work();
+                this.start_time = new Date();
                 this.notify('Working on ' + issue.key, "");
                 this.label.set_text("Working on " + issue.key);
             } else {
@@ -158,9 +154,14 @@ const Indicator = GObject.registerClass(
             }
             if (this.stop_work_timeout) {
                 Mainloop.source_remove(this.stop_work_timeout);
+                this.stop_work_timeout = null;
             }
 
-            this.current_issue = null;
+            if (this.current_issue) {
+                this._log_time(this.current_issue, this.start_time, new Date());
+                this.current_issue = null;
+            }
+
             this.update_label();
         }
 
@@ -218,14 +219,10 @@ const Indicator = GObject.registerClass(
         }
 
         notify(msg, details) {
-            const _this = this;
-
             if (!this.notifications_source) {
                 this.notification_source = new MessageTray.Source("Tempomate", 'system-run-symbolic');
                 Main.messageTray.add(this.notification_source);
-                this.notification_source.connect("destroy", function () {
-                    _this.notification_source = null;
-                });
+                this.notification_source.connect("destroy", Lang.bind(this, () => this.notification_source = null));
             }
 
             if (this.notification) {
@@ -239,13 +236,12 @@ const Indicator = GObject.registerClass(
 
             this.notification_source.showNotification(this.notification);
 
-            this.notification.connect("destroy", function name() {
-                // TODO: adjust end of any ongoing worklog
-                if (_this.notification) {
-                    _this.notification = null;
-                    _this.stop_work();
+            this.notification.connect("destroy", Lang.bind(this, () => {
+                if (this.notification) {
+                    this.notification = null;
+                    this.stop_work();
                 }
-            });
+            }));
         }
 
         _getRequest(key, query) {
