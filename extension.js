@@ -293,7 +293,7 @@ const Indicator = GObject.registerClass(
             }
 
             // TODO convert to local time 
-            var start_string = start.toJSON().replace('T', ' ').replace("Z", "");
+            var start_string = this._format_date(start);
 
             let payload = {
                 "billableSeconds": Math.round((end.getTime() - start.getTime()) / 1000),
@@ -330,6 +330,27 @@ const Indicator = GObject.registerClass(
                     log(`Could not parse soup response body ${e}`)
                 }
             });
+        }
+
+        _format_date(date) {
+            const options = {
+                year: 'numeric',
+                month: 'numeric',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: 'numeric',
+                second: 'numeric'
+            };
+            const dateTimeFormat = new Intl.DateTimeFormat('de-DE', options);
+            const parts = dateTimeFormat.formatToParts(date)
+                .filter((p) => p.type !== "literal")
+                .reduce((result, next) => {
+                    const x = {}
+                    x[next.type] = next.value;
+                    return Object.assign(result, x);
+                }, {});
+
+            return parts.year + "-" + parts.month + "-" + parts.day + " " + parts.hour + ":" + parts.minute + ":" + parts.second + ".000";
         }
 
         _save_state() {
