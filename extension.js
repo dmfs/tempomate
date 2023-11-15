@@ -30,6 +30,7 @@ const PopupMenu = imports.ui.popupMenu;
 const MessageTray = imports.ui.messageTray;
 const Mainloop = imports.mainloop;
 const {IssueMenuItem} = Me.imports.ui.menuitem;
+const {NotificationStateMachine} = Me.imports.ui.notification_state_machine;
 
 const {TempomateService} = Me.imports.dbus.tempomate_service;
 const {JiraApi2Client} = Me.imports.client.jira_client;
@@ -48,6 +49,7 @@ const Indicator = GObject.registerClass(
             this.add_child(this.label);
             this.setMenu(new PopupMenu.PopupMenu(this, 0.0, St.Side.TOP, 0));
             this.settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.tempomate.dmfs.org');
+            this._notification_state_machine = new NotificationStateMachine();
             this._restore()
             this._settingsChangedId = this.settings.connect('changed', Lang.bind(this, this._settingsChanged));
             this._settingsChanged();
@@ -55,7 +57,6 @@ const Indicator = GObject.registerClass(
             this.updateUI(this.menu, true);
             this.menu.connect("open-state-changed", Lang.bind(this, this.updateUI))
             this.dbus_service = new TempomateService(Lang.bind(this, this.fetch_and_start_or_continue_work));
-            this.notify_idle();
         }
 
         _restore() {
@@ -73,13 +74,11 @@ const Indicator = GObject.registerClass(
             this.token = this.settings.get_string('token');
             this.client = new JiraApi2Client(this.host, this.token);
 
-            const old_nag_interval = this.nag_interval;
-            this.nag_interval = this.settings.get_int("nag-notification-interval");
-            const old_nag_notifications = this.nag_notifications;
-            this.nag_notifications = this.settings.get_boolean("nag-notifications")
-            if (!this.current_issue && (old_nag_interval !== this.nag_interval || old_nag_notifications !== this.nag_notifications)) {
-                this.notify_idle();
-            }
+            this._notification_state_machine.update_settings({
+                idle_notifications: this.settings.get_boolean("nag-notifications"),
+                idle_notification_interval: this.settings.get_int("nag-notification-interval")
+            })
+
             this._refreshFilters();
         }
 
@@ -126,28 +125,19 @@ const Indicator = GObject.registerClass(
             if (!issue || !issue.key) {
                 return
             }
-            if (this.nag_timeout) {
-                Mainloop.source_remove(this.nag_timeout);
-                this.nag_timeout = null;
-            }
+            log("starting work " + issue.key)
 
             this.add_recent_issue(issue);
             this.end_time = new Date(new Date().getTime() + this.default_duration * 1000);
 
             if (this.current_issue !== issue.key) {
-                this.stop_work(false);
+                this.stop_work();
                 this.start_time = new Date();
-                this.notify_work('Working on ' + issue.key, "");
-                this.label.set_text("Working on " + issue.key);
-            } else {
-                this.update_label();
+                this.current_issue = issue.key;
             }
+            this.update_label();
             this._log_time(issue.key, this.start_time, this.end_time);
-            this.current_issue = issue.key;
-            if (this.stop_work_timeout) {
-                Mainloop.source_remove(this.stop_work_timeout);
-            }
-            this.stop_work_timeout = Mainloop.timeout_add_seconds(this.default_duration, Lang.bind(this, () => this.stop_work(true)));
+            this.stop_work_timeout = Mainloop.timeout_add_seconds(this.default_duration, Lang.bind(this, this.stop_work));
         }
 
         // Add an issue to recent issues and update the UI
@@ -158,17 +148,15 @@ const Indicator = GObject.registerClass(
             }
         }
 
-        stop_work(is_idle) {
-            Main.notify('Work on ' + this.current_issue + " done");
-            if (is_idle) {
-                this.notify_idle();
+        stop_work() {
+            if (!this.current_issue) {
+                // nothing to do
+                return;
             }
 
-            if (this.notification) {
-                const n = this.notification;
-                this.notification = null;
-                n.destroy(3);
-            }
+            log("stopping work")
+            this._notification_state_machine.stop_work();
+
             if (this.stop_work_timeout) {
                 Mainloop.source_remove(this.stop_work_timeout);
                 this.stop_work_timeout = null;
@@ -183,12 +171,11 @@ const Indicator = GObject.registerClass(
         }
 
         update_label() {
+            log("updating label for " + this.current_issue)
             if (this.current_issue) {
                 const remaining_duration = this.end_time.getTime() - new Date().getTime();
                 this.label.set_text("Working on " + this.current_issue + " (" + Math.round((remaining_duration / 60000)) + "m remaining)");
-                if (this.notification) {
-                    this.notification.update("Working on " + this.current_issue, "" + Math.round((remaining_duration / 60000)) + " minutes remaining");
-                }
+                this._notification_state_machine.start_work(this.current_issue, Math.round((remaining_duration / 60000)) + " minutes remaining", Lang.bind(this, this.stop_work))
             } else {
                 this.label.set_text("⚠️ Not working on an issue ⚠️");
             }
@@ -229,52 +216,10 @@ const Indicator = GObject.registerClass(
             if (this.stop_work_timeout) {
                 Mainloop.source_remove(this.stop_work_timeout);
             }
-            if (this.nag_timeout) {
-                Mainloop.source_remove(this.nag_timeout);
-            }
+            this._notification_state_machine.destroy();
             this._removeTimeout();
             this.dbus_service.destroy();
             super.destroy();
-        }
-
-        notify_work(msg, details) {
-            if (this.notification) {
-                this.notification.destroy(3);
-            }
-
-            this.notification = new MessageTray.Notification(this.ensure_notification_source(), msg, details);
-
-            this.notification.setTransient(false);
-            this.notification.setResident(true);
-
-            this.ensure_notification_source().showNotification(this.notification);
-
-            this.notification.connect("destroy", Lang.bind(this, () => {
-                if (this.notification) {
-                    this.notification = null;
-                    this.stop_work(true);
-                }
-            }));
-        }
-
-        notify_idle() {
-            if (this.nag_timeout) {
-                Mainloop.source_remove(this.nag_timeout);
-            }
-            if (this.nag_notifications) {
-                Main.notify("⚠️ Your work is not tracked ⚠️")
-                this.nag_timeout = Mainloop.timeout_add_seconds(this.nag_interval, Lang.bind(this, this.notify_idle));
-
-            }
-        }
-
-        ensure_notification_source() {
-            if (!this.notifications_source) {
-                this.notification_source = new MessageTray.Source("Tempomate", 'system-run-symbolic');
-                Main.messageTray.add(this.notification_source);
-                this.notification_source.connect("destroy", Lang.bind(this, () => this.notification_source = null));
-            }
-            return this.notification_source;
         }
 
         _getRequest(key, query) {
@@ -285,9 +230,10 @@ const Indicator = GObject.registerClass(
         See https://www.tempo.io/server-api-documentation/timesheets#tag/Worklogs/operation/createWorklog
         */
         _log_time(issue, start, end) {
+            log("logging work for " + issue);
             let method = "POST";
             let URL = this.host + '/rest/tempo-timesheets/4/worklogs';
-            if (this.current_id && this.current_issue === issue) {
+            if (this.current_id && this.last_logged_issue === issue) {
                 URL = URL + "/" + this.current_id;
                 method = "PUT";
             }
@@ -325,6 +271,7 @@ const Indicator = GObject.registerClass(
                     const json = JSON.parse(body);
                     if (Array.isArray(json)) {
                         _this.current_id = json[0].tempoWorklogId;
+                        this.last_logged_issue = issue;
                     }
                 } catch (e) {
                     log(`Could not parse soup response body ${e}`)
