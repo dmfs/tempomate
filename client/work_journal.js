@@ -36,6 +36,23 @@ var WorkJournal = class WorkJournal {
         }));
     }
 
+    current_log(result_handler) {
+        this._jira_client_supplier().post("/rest/tempo-timesheets/4/worklogs/search", {
+                from: (d => new Date(d.setDate(d.getDate() - 1)))(new Date).toISOString().substring(0, 10), // yesterday
+                to: (d => new Date(d.setDate(d.getDate() + 1)))(new Date).toISOString().substring(0, 10), // tomorrow
+                worker: [this._username_supplier()]
+            },
+            (response) => {
+                if (Array.isArray(response)) {
+                    const now = new Date().getTime();
+                    const current = response.find(r => new Date(r.started).getTime() <= now && now < new Date(r.started).getTime() + r.timeSpentSeconds * 1000)
+                    if (current) {
+                        result_handler(current);
+                    }
+                }
+            });
+    }
+
     _format_date(date) {
         const options = {
             year: 'numeric',

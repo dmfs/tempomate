@@ -38,6 +38,7 @@ var JiraApi2Client = class JiraApi2Client {
         if (payload) {
             let utf8Encode = new TextEncoder();
             message.set_request_body_from_bytes("application/json", utf8Encode.encode(JSON.stringify(payload)));
+            log(method + " payload " + JSON.stringify(payload))
         }
 
         this.httpSession.send_and_read_async(message, 0, null, Lang.bind(this,
