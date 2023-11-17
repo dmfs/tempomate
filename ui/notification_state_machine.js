@@ -72,8 +72,10 @@ var NotificationStateMachine = class NotificationStateMachine {
 
 
     _idle() {
+        log("idle called")
         if (this._settings.idle_notifications && !this._current_issue) {
 
+            log("creating idle notification")
             this._dispose_notification();
 
             this._notification = new MessageTray.Notification(this._ensure_notification_source(), "⚠️ Your work is not tracked ⚠️");
@@ -87,17 +89,20 @@ var NotificationStateMachine = class NotificationStateMachine {
 
     _start_idle_timeout() {
         this._remove_idle_timeout();
+        log("submitting idle timeout");
         this._idle_timeout = Mainloop.timeout_add_seconds(this._settings.idle_notification_interval, Lang.bind(this, this._idle));
     }
 
     _remove_idle_timeout() {
         if (this._idle_timeout) {
+            log("dropping idle timeout");
             Mainloop.source_remove(this._idle_timeout);
         }
     }
 
     _dispose_notification() {
         if (this._notification) {
+            log("notification disposed")
             const old_notification = this._notification;
             this._notification = null;
             old_notification.destroy();
@@ -116,6 +121,7 @@ var NotificationStateMachine = class NotificationStateMachine {
 
 
     destroy() {
+        log("state machine diposed")
         this._dispose_notification();
         this._remove_idle_timeout();
     }

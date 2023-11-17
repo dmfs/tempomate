@@ -34,6 +34,7 @@ const {NotificationStateMachine} = Me.imports.ui.notification_state_machine;
 
 const {TempomateService} = Me.imports.dbus.tempomate_service;
 const {JiraApi2Client} = Me.imports.client.jira_client;
+const {WorkJournal} = Me.imports.client.work_journal;
 
 const _ = ExtensionUtils.gettext;
 
@@ -54,6 +55,7 @@ const Indicator = GObject.registerClass(
             this._settingsChangedId = this.settings.connect('changed', Lang.bind(this, this._settingsChanged));
             this._settingsChanged();
             this._refresh_label();
+            this._work_journal = new WorkJournal(Lang.bind(this, () => this.client), Lang.bind(this, () => this.username));
             this.updateUI(this.menu, true);
             this.menu.connect("open-state-changed", Lang.bind(this, this.updateUI))
             this.dbus_service = new TempomateService(Lang.bind(this, this.fetch_and_start_or_continue_work));
@@ -136,7 +138,7 @@ const Indicator = GObject.registerClass(
                 this.current_issue = issue.key;
             }
             this.update_label();
-            this._log_time(issue.key, this.start_time, this.end_time);
+            this._work_journal.log_work(issue.key, this.start_time, this.end_time);
             this.stop_work_timeout = Mainloop.timeout_add_seconds(this.default_duration, Lang.bind(this, this.stop_work));
         }
 
@@ -163,7 +165,7 @@ const Indicator = GObject.registerClass(
             }
 
             if (this.current_issue) {
-                this._log_time(this.current_issue, this.start_time, new Date());
+                this._work_journal.log_work(this.current_issue, this.start_time, new Date());
                 this.current_issue = null;
             }
 
@@ -226,79 +228,6 @@ const Indicator = GObject.registerClass(
             this.client.filter(query, Lang.bind(this, (result) => this.issues[key] = result.issues))
         }
 
-        /*
-        See https://www.tempo.io/server-api-documentation/timesheets#tag/Worklogs/operation/createWorklog
-        */
-        _log_time(issue, start, end) {
-            log("logging work for " + issue);
-            let method = "POST";
-            let URL = this.host + '/rest/tempo-timesheets/4/worklogs';
-            if (this.current_id && this.last_logged_issue === issue) {
-                URL = URL + "/" + this.current_id;
-                method = "PUT";
-            }
-
-            // TODO convert to local time 
-            var start_string = this._format_date(start);
-
-            let payload = {
-                "billableSeconds": Math.round((end.getTime() - start.getTime()) / 1000),
-                "includeNonWorkingDays": false,
-                "originTaskId": issue,
-                "started": start_string,
-                "timeSpentSeconds": Math.round((end.getTime() - start.getTime()) / 1000),
-                "worker": this.username
-            };
-
-            let utf8Encode = new TextEncoder();
-
-
-            let _httpSession = new Soup.Session();
-            let message = Soup.Message.new(method, URL);
-            message.request_headers.append("Authorization", "Bearer " + this.token);
-            message.set_request_body_from_bytes("application/json", utf8Encode.encode(JSON.stringify(payload)));
-
-            const _this = this;
-
-            _httpSession.send_and_read_async(message, 0, null, (source, response_message) => {
-                let body = ''
-
-                try {
-                    const bytes = _httpSession.send_and_read_finish(response_message);
-                    const decoder = new TextDecoder();
-                    body = decoder.decode(bytes.get_data());
-
-                    const json = JSON.parse(body);
-                    if (Array.isArray(json)) {
-                        _this.current_id = json[0].tempoWorklogId;
-                        this.last_logged_issue = issue;
-                    }
-                } catch (e) {
-                    log(`Could not parse soup response body ${e}`)
-                }
-            });
-        }
-
-        _format_date(date) {
-            const options = {
-                year: 'numeric',
-                month: 'numeric',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: 'numeric',
-                second: 'numeric'
-            };
-            const dateTimeFormat = new Intl.DateTimeFormat('de-DE', options);
-            const parts = dateTimeFormat.formatToParts(date)
-                .filter((p) => p.type !== "literal")
-                .reduce((result, next) => {
-                    const x = {}
-                    x[next.type] = next.value;
-                    return Object.assign(result, x);
-                }, {});
-
-            return parts.year + "-" + parts.month + "-" + parts.day + " " + parts.hour + ":" + parts.minute + ":" + parts.second + ".000";
-        }
 
         _save_state() {
             this.settings.set_strv("recent-issues", this.recent_issues.map((ri) => JSON.stringify(ri)));
