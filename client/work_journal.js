@@ -1,10 +1,53 @@
 const Lang = imports.lang;
 
 var WorkJournal = class WorkJournal {
-    constructor(jira_client_supplier, username_supplier) {
+    constructor(settings, jira_client_supplier, username_supplier) {
+        this._settings = settings;
         this._jira_client_supplier = jira_client_supplier;
-        this._current_work_log = null;
         this._username_supplier = username_supplier;
+
+        const last_work_log = JSON.parse(settings.get_string("most-recent-work-log"));
+        this._current_work_log = last_work_log && new Date().getTime() < new Date(last_work_log.started).getTime() + last_work_log.timeSpentSeconds * 1000 ? last_work_log : null;
+        this._current_work = this._current_work_log ? {
+            key: this._current_work_log.issue.key,
+            start: new Date(last_work_log.started),
+            duration: last_work_log.timeSpentSeconds
+        } : null;
+    }
+
+    start_work(issue, duration = 3600) {
+        if (this._current_work && this._current_work.key !== issue) {
+            this.stop_work();
+        }
+
+        const now = new Date();
+
+        if (this._current_work) {
+            // continue work
+            this.log_work(issue, this._current_work.start, new Date(now.getTime() + duration * 1000))
+            this._current_work.duration = (now.getTime() - this._current_work.start.getTime()) / 1000 + duration
+        } else {
+            this.log_work(issue, now, new Date(now.getTime() + duration * 1000))
+            this._current_work = {
+                key: issue,
+                start: now,
+                duration: duration
+            }
+        }
+    }
+
+    stop_work() {
+        if (this._current_work_log) {
+            this.log_work(this._current_work_log.issue.key, new Date(this._current_work_log.started), new Date());
+            this._current_work_log = null;
+            this._current_work = null;
+        }
+    }
+
+    current_work() {
+        if (this._current_work) {
+            return this._current_work;
+        }
     }
 
     /*
@@ -33,6 +76,7 @@ var WorkJournal = class WorkJournal {
             if (Array.isArray(response)) {
                 this._current_work_log = response[0];
             }
+            this._settings.set_string("most-recent-work-log", JSON.stringify(this._current_work_log))
         }));
     }
 
@@ -51,6 +95,13 @@ var WorkJournal = class WorkJournal {
                     }
                 }
             });
+    }
+
+    destroy() {
+        // see https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/2621
+        // this isn't called when the user logs out
+        //for the time being we update the setting, every time we update the work-log
+        //      this._settings.set_string("most-recent-work-log", JSON.stringify(this._current_work_log))
     }
 
     _format_date(date) {
