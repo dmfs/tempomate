@@ -5,8 +5,11 @@ var WorkJournal = class WorkJournal {
         this._settings = settings;
         this._jira_client_supplier = jira_client_supplier;
         this._username_supplier = username_supplier;
+        // TODO :update when changed
+        this._gap_auto_close_minutes = JSON.parse(settings.get_int("gap-auto-close-minutes"));
 
         const last_work_log = JSON.parse(settings.get_string("most-recent-work-log"));
+        this._previous_work_log = null;
         this._current_work_log = last_work_log && new Date().getTime() < new Date(last_work_log.started).getTime() + last_work_log.timeSpentSeconds * 1000 ? last_work_log : null;
         this._current_work = this._current_work_log ? {
             key: this._current_work_log.issue.key,
@@ -27,7 +30,22 @@ var WorkJournal = class WorkJournal {
             this.log_work(issue, this._current_work.start, new Date(now.getTime() + duration * 1000))
             this._current_work.duration = (now.getTime() - this._current_work.start.getTime()) / 1000 + duration
         } else {
-            this.log_work(issue, now, new Date(now.getTime() + duration * 1000))
+            let start = now;
+            if (this._previous_work_log) {
+                const prev_end = new Date(this._previous_work_log.started).getTime() + this._previous_work_log.timeSpentSeconds * 1000;
+                if (now.getTime() < prev_end + this._gap_auto_close_minutes * 1000 * 60) {
+                    if (this._previous_work_log.issue.key === issue) {
+                        // same issue, just extend the work-log
+                        this._current_work_log = this._previous_work_log;
+                        start = new Date(this._previous_work_log.started)
+                    } else {
+                        // new issue, continue seamlessly
+                        start = new Date(prev_end);
+                        log("dating work back to " + start);
+                    }
+                }
+            }
+            this.log_work(issue, start, new Date(now.getTime() + duration * 1000))
             this._current_work = {
                 key: issue,
                 start: now,
@@ -37,7 +55,8 @@ var WorkJournal = class WorkJournal {
     }
 
     stop_work() {
-        if (this._current_work_log) {
+        if (this._current_work) {
+            this._previous_work_log = this._current_work_log;
             this.log_work(this._current_work_log.issue.key, new Date(this._current_work_log.started), new Date());
             this._current_work_log = null;
             this._current_work = null;

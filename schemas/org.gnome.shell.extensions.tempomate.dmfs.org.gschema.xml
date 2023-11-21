@@ -31,7 +31,7 @@
 			<summary>Default duration</summary>
 			<description>The default duration of a work-log in minutes</description>
 		</key>
-		<key name="close-gap-minutes" type="i">
+		<key name="gap-auto-close-minutes" type="i">
 			<default>5</default>
 			<summary>Close Gap Minutes</summary>
 			<description>Automatically close gaps to previous work-logs if gap is smaller than this number of minutes.</description>
