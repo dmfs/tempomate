@@ -52,5 +52,10 @@
 			<summary>Nag Notification Interval</summary>
 			<description>The interval in seconds at which to show the nag notifications when enabled.</description>
 		</key>
+		<key name="most-recent-work-log" type="s">
+			<default>"null"</default>
+			<summary>Most recent work-log</summary>
+			<description>The last work-log sent to Jira</description>
+		</key>
 	</schema>
 </schemalist>
