@@ -37,7 +37,7 @@ var NotificationsSettingsPage = GObject.registerClass({
             // don't use bind because that updates each time the values changes
             nag_interval.connect('unmap', (widget) => settings.set_int("nag-notification-interval", widget.value));
             const nag_interval_row = new Adw.ActionRow({
-                title: "Nag interval"
+                title: "Nag interval (Seconds)"
             });
             nag_interval_row.add_suffix(nag_interval);
 
