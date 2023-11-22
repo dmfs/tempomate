@@ -26,10 +26,24 @@ var TrackingSettingsPage = GObject.registerClass({
 
             duration.connect('unmap', (widget) => settings.set_int("default-duration", widget.value));
             const duration_row = new Adw.ActionRow({
-                title: "Duration"
+                title: "Worklog Duration (Minutes)"
             });
             duration_row.add_suffix(duration);
             group.add(duration_row);
+
+            const auto_close_gap = new Gtk.SpinButton({
+                valign: Gtk.Align.CENTER
+            });
+            auto_close_gap.set_range(0, 120);
+            auto_close_gap.set_value(settings.get_int("gap-auto-close-minutes"));
+            auto_close_gap.set_increments(1, 5);
+
+            auto_close_gap.connect('unmap', (widget) => settings.set_int("gap-auto-close-minutes", widget.value));
+            const auto_close_gap_row = new Adw.ActionRow({
+                title: "Close gap if less or equal (Minutes)"
+            });
+            auto_close_gap_row.add_suffix(auto_close_gap);
+            group.add(auto_close_gap_row);
 
             this.add(group);
         }

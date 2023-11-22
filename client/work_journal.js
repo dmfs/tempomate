@@ -5,14 +5,21 @@ var WorkJournal = class WorkJournal {
         this._settings = settings;
         this._jira_client_supplier = jira_client_supplier;
         this._username_supplier = username_supplier;
+        this._settings_changed_id = settings.connect('changed', Lang.bind(this, this._settings_changed));
+        this._settings_changed();
 
         const last_work_log = JSON.parse(settings.get_string("most-recent-work-log"));
+        this._previous_work_log = null;
         this._current_work_log = last_work_log && new Date().getTime() < new Date(last_work_log.started).getTime() + last_work_log.timeSpentSeconds * 1000 ? last_work_log : null;
         this._current_work = this._current_work_log ? {
             key: this._current_work_log.issue.key,
             start: new Date(last_work_log.started),
             duration: last_work_log.timeSpentSeconds
         } : null;
+    }
+
+    _settings_changed() {
+        this._gap_auto_close_minutes = JSON.parse(this._settings.get_int("gap-auto-close-minutes"));
     }
 
     start_work(issue, duration = 3600) {
@@ -27,7 +34,22 @@ var WorkJournal = class WorkJournal {
             this.log_work(issue, this._current_work.start, new Date(now.getTime() + duration * 1000))
             this._current_work.duration = (now.getTime() - this._current_work.start.getTime()) / 1000 + duration
         } else {
-            this.log_work(issue, now, new Date(now.getTime() + duration * 1000))
+            let start = now;
+            if (this._previous_work_log) {
+                const prev_end = new Date(this._previous_work_log.started).getTime() + this._previous_work_log.timeSpentSeconds * 1000;
+                if (now.getTime() < prev_end + this._gap_auto_close_minutes * 1000 * 60) {
+                    if (this._previous_work_log.issue.key === issue) {
+                        // same issue, just extend the work-log
+                        this._current_work_log = this._previous_work_log;
+                        start = new Date(this._previous_work_log.started)
+                    } else {
+                        // new issue, continue seamlessly
+                        start = new Date(prev_end);
+                        log("dating work back to " + start);
+                    }
+                }
+            }
+            this.log_work(issue, start, new Date(now.getTime() + duration * 1000))
             this._current_work = {
                 key: issue,
                 start: now,
@@ -37,8 +59,12 @@ var WorkJournal = class WorkJournal {
     }
 
     stop_work() {
-        if (this._current_work_log) {
-            this.log_work(this._current_work_log.issue.key, new Date(this._current_work_log.started), new Date());
+        if (this._current_work) {
+            const started = new Date(this._current_work_log.started);
+            const now = new Date();
+            this._previous_work_log = this._current_work_log;
+            this._previous_work_log.timeSpentSeconds = (now.getTime() - started.getTime()) / 1000
+            this.log_work(this._current_work_log.issue.key, started, now);
             this._current_work_log = null;
             this._current_work = null;
         }
@@ -80,7 +106,8 @@ var WorkJournal = class WorkJournal {
         }));
     }
 
-    current_log(result_handler) {
+    // not in use yet
+    _current_log(result_handler) {
         this._jira_client_supplier().post("/rest/tempo-timesheets/4/worklogs/search", {
                 from: (d => new Date(d.setDate(d.getDate() - 1)))(new Date).toISOString().substring(0, 10), // yesterday
                 to: (d => new Date(d.setDate(d.getDate() + 1)))(new Date).toISOString().substring(0, 10), // tomorrow
@@ -100,8 +127,10 @@ var WorkJournal = class WorkJournal {
     destroy() {
         // see https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/2621
         // this isn't called when the user logs out
-        //for the time being we update the setting, every time we update the work-log
-        //      this._settings.set_string("most-recent-work-log", JSON.stringify(this._current_work_log))
+        // for the time being, we also update the setting every time we update the work-log
+        this._settings.set_string("most-recent-work-log", JSON.stringify(this._current_work_log))
+
+        this._settings.disconnect(this._settings_changed_id)
     }
 
     _format_date(date) {

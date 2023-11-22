@@ -217,6 +217,7 @@ const Indicator = GObject.registerClass(
             this._work_journal.destroy();
             this._removeTimeout();
             this.dbus_service.destroy();
+            this.settings.disconnect(this._settingsChangedId);
             super.destroy();
         }
 
