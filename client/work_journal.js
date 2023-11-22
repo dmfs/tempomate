@@ -60,8 +60,11 @@ var WorkJournal = class WorkJournal {
 
     stop_work() {
         if (this._current_work) {
+            const started = new Date(this._current_work_log.started);
+            const now = new Date();
             this._previous_work_log = this._current_work_log;
-            this.log_work(this._current_work_log.issue.key, new Date(this._current_work_log.started), new Date());
+            this._previous_work_log.timeSpentSeconds = (now.getTime() - started.getTime()) / 1000
+            this.log_work(this._current_work_log.issue.key, started, now);
             this._current_work_log = null;
             this._current_work = null;
         }
