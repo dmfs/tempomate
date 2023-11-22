@@ -5,8 +5,8 @@ var WorkJournal = class WorkJournal {
         this._settings = settings;
         this._jira_client_supplier = jira_client_supplier;
         this._username_supplier = username_supplier;
-        // TODO :update when changed
-        this._gap_auto_close_minutes = JSON.parse(settings.get_int("gap-auto-close-minutes"));
+        this._settings_changed_id = settings.connect('changed', Lang.bind(this, this._settings_changed));
+        this._settings_changed();
 
         const last_work_log = JSON.parse(settings.get_string("most-recent-work-log"));
         this._previous_work_log = null;
@@ -16,6 +16,10 @@ var WorkJournal = class WorkJournal {
             start: new Date(last_work_log.started),
             duration: last_work_log.timeSpentSeconds
         } : null;
+    }
+
+    _settings_changed() {
+        this._gap_auto_close_minutes = JSON.parse(this._settings.get_int("gap-auto-close-minutes"));
     }
 
     start_work(issue, duration = 3600) {
@@ -99,7 +103,8 @@ var WorkJournal = class WorkJournal {
         }));
     }
 
-    current_log(result_handler) {
+    // not in use yet
+    _current_log(result_handler) {
         this._jira_client_supplier().post("/rest/tempo-timesheets/4/worklogs/search", {
                 from: (d => new Date(d.setDate(d.getDate() - 1)))(new Date).toISOString().substring(0, 10), // yesterday
                 to: (d => new Date(d.setDate(d.getDate() + 1)))(new Date).toISOString().substring(0, 10), // tomorrow
@@ -119,8 +124,10 @@ var WorkJournal = class WorkJournal {
     destroy() {
         // see https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/2621
         // this isn't called when the user logs out
-        //for the time being we update the setting, every time we update the work-log
-        //      this._settings.set_string("most-recent-work-log", JSON.stringify(this._current_work_log))
+        // for the time being, we also update the setting every time we update the work-log
+        this._settings.set_string("most-recent-work-log", JSON.stringify(this._current_work_log))
+
+        this._settings.disconnect(this._settings_changed_id)
     }
 
     _format_date(date) {
