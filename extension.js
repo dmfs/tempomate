@@ -15,32 +15,24 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-/* exported init */
+import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-const GETTEXT_DOMAIN = 'tempomate';
+import GObject from 'gi://GObject';
+import St from 'gi://St';
+import GLib from 'gi://GLib';
 
-const {GObject, St, Soup} = imports.gi;
-
-const Lang = imports.lang;
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
-const Main = imports.ui.main;
-const PanelMenu = imports.ui.panelMenu;
-const PopupMenu = imports.ui.popupMenu;
-const MessageTray = imports.ui.messageTray;
-const Mainloop = imports.mainloop;
-const {IssueMenuItem} = Me.imports.ui.menuitem;
-const {NotificationStateMachine} = Me.imports.ui.notification_state_machine;
-
-const {TempomateService} = Me.imports.dbus.tempomate_service;
-const {JiraApi2Client} = Me.imports.client.jira_client;
-const {WorkJournal} = Me.imports.client.work_journal;
-
-const _ = ExtensionUtils.gettext;
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import {JiraApi2Client} from './client/jira_client.js';
+import {WorkJournal} from './client/work_journal.js';
+import {TempomateService} from './dbus/tempomate_service.js';
+import {IssueMenuItem} from './ui/menuitem.js';
+import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import {NotificationStateMachine} from './ui/notification_state_machine.js';
 
 const Indicator = GObject.registerClass(
     class Indicator extends PanelMenu.Button {
-        _init() {
+        _init(settings) {
             super._init(0.0, _('Tempomate'));
 
             this.label = new St.Label({
@@ -49,25 +41,36 @@ const Indicator = GObject.registerClass(
             });
             this.add_child(this.label);
             this.setMenu(new PopupMenu.PopupMenu(this, 0.0, St.Side.TOP, 0));
-            this.settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.tempomate.dmfs.org');
+            this.settings = settings;
+            this._work_journal = new WorkJournal(this.settings, () => this.client, () => this.username);
             this._notification_state_machine = new NotificationStateMachine();
-            this._work_journal = new WorkJournal(this.settings, Lang.bind(this, () => this.client), Lang.bind(this, () => this.username));
             this._restore()
-            this._settingsChangedId = this.settings.connect('changed', Lang.bind(this, this._settingsChanged));
+            this._settingsChangedId = this.settings.connect('changed', this._settingsChanged.bind(this));
             this._settingsChanged();
-            this._refresh_label();
+            this.update_label();
             this.updateUI(this.menu, true);
-            this.menu.connect("open-state-changed", Lang.bind(this, this.updateUI))
-            this.dbus_service = new TempomateService(Lang.bind(this, this.fetch_and_start_or_continue_work));
+            this.menu.connect("open-state-changed", this.updateUI.bind(this))
+            this.dbus_service = new TempomateService(this.fetch_and_start_or_continue_work.bind(this));
             if (this._work_journal.current_work()) {
                 // set up stop timer if recent work has been restored
                 const remaining = this._work_journal.current_work().start.getTime() / 1000 + this._work_journal.current_work().duration - new Date().getTime() / 1000;
                 if (remaining > 0) {
-                    this.stop_work_timeout = Mainloop.timeout_add_seconds(
-                        remaining,
-                        Lang.bind(this, this.stop_work));
+                    this.stop_work_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, remaining, () => {
+                        this.stop_work();
+                        return GLib.SOURCE_REMOVE;
+                    });
                 }
             }
+
+            this._timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 60, () => {
+                this.update_label();
+                return GLib.SOURCE_CONTINUE;
+            });
+
+            this._filter_refresh_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 900, () => {
+                this._refreshFilters();
+                return GLib.SOURCE_CONTINUE;
+            });
         }
 
         _restore() {
@@ -123,12 +126,12 @@ const Indicator = GObject.registerClass(
         generateMenuItem(issue) {
             const _this = this;
             const item = new IssueMenuItem(issue.key, issue.fields.summary);
-            item.connect('activate', Lang.bind(this, () => this.start_or_continue_work(issue)));
+            item.connect('activate', () => this.start_or_continue_work(issue));
             return item;
         }
 
         fetch_and_start_or_continue_work(issue) {
-            this.client.issue(issue, Lang.bind(this, this.start_or_continue_work))
+            this.client.issue(issue, this.start_or_continue_work.bind(this))
         }
 
 
@@ -139,7 +142,13 @@ const Indicator = GObject.registerClass(
             log("starting work " + issue.key)
             this.add_recent_issue(issue);
             this._work_journal.start_work(issue.key, this.default_duration);
-            this.stop_work_timeout = Mainloop.timeout_add_seconds(this.default_duration, Lang.bind(this, this.stop_work));
+            if (this.stop_work_timeout) {
+                GLib.Source.remove(this.stop_work_timeout);
+            }
+            this.stop_work_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, this.default_duration, () => {
+                this.stop_work();
+                return GLib.SOURCE_REMOVE;
+            })
             this.update_label();
         }
 
@@ -160,7 +169,7 @@ const Indicator = GObject.registerClass(
             this._notification_state_machine.stop_work();
 
             if (this.stop_work_timeout) {
-                Mainloop.source_remove(this.stop_work_timeout);
+                GLib.Source.remove(this.stop_work_timeout);
                 this.stop_work_timeout = null;
             }
             this._work_journal.stop_work();
@@ -172,52 +181,40 @@ const Indicator = GObject.registerClass(
             if (current_work) {
                 const remaining_duration = current_work.start.getTime() + current_work.duration * 1000 - new Date().getTime();
                 this.label.set_text("Working on " + current_work.key + " (" + Math.round((remaining_duration / 60000)) + "m remaining)");
-                this._notification_state_machine.start_work(current_work.key, Math.round((remaining_duration / 60000)) + " minutes remaining", Lang.bind(this, this.stop_work))
+                this._notification_state_machine.start_work(current_work.key, Math.round((remaining_duration / 60000)) + " minutes remaining", this.stop_work.bind(this));
             } else {
                 this.label.set_text("⚠️ Not working on an issue ⚠️");
             }
         }
 
-        _refresh_label() {
-            this._removeTimeout();
-            this._timeout = Mainloop.timeout_add_seconds(60, Lang.bind(this, this._refresh_label));
-            this.update_label();
-            return true;
-        }
-
-        _removeTimeout() {
-            if (this._timeout) {
-                Mainloop.source_remove(this._timeout);
-                this._timeout = null;
-            }
-        }
-
         _refreshFilters() {
             for (const q in this.queries) {
-                this.client.filter(this.queries[q].jql, Lang.bind(this, (result) => this.issues[this.queries[q].name] = result.issues))
-            }
-            this._removeFilterTimeout();
-            this._filter_timeout = Mainloop.timeout_add_seconds(900, Lang.bind(this, this._refreshFilters));
-            return true;
-        }
-
-        _removeFilterTimeout() {
-            if (this._filter_timeout) {
-                Mainloop.source_remove(this._filter_timeout);
-                this._filter_timeout = null;
+                this.client.filter(this.queries[q].jql, (result) => this.issues[this.queries[q].name] = result.issues)
             }
         }
 
         destroy() {
             this._save_state();
             if (this.stop_work_timeout) {
-                Mainloop.source_remove(this.stop_work_timeout);
+                GLib.Source.remove(this.stop_work_timeout);
+                this.stop_work_timeout = null;
             }
+
+            if (this._timeout) {
+                GLib.Source.remove(this._timeout);
+                this._timeout = null;
+            }
+
+            if (this._filter_refresh_timeout) {
+                GLib.Source.remove(this._filter_refresh_timeout);
+                this._filter_timeout = null;
+            }
+
             this._notification_state_machine.destroy();
             this._work_journal.destroy();
-            this._removeTimeout();
             this.dbus_service.destroy();
             this.settings.disconnect(this._settingsChangedId);
+            this.settings = null;
             super.destroy();
         }
 
@@ -227,24 +224,18 @@ const Indicator = GObject.registerClass(
         }
     });
 
-class Extension {
-    constructor(uuid) {
-        this._uuid = uuid;
-
-        ExtensionUtils.initTranslations(GETTEXT_DOMAIN);
+export default class TempomateExtension extends Extension {
+    constructor(metadata) {
+        super(metadata);
     }
 
     enable() {
-        this._indicator = new Indicator();
+        this._indicator = new Indicator(this.getSettings());
         Main.panel.addToStatusArea(this._uuid, this._indicator);
     }
 
     disable() {
-        this._indicator.destroy();
+        this._indicator?.destroy();
         this._indicator = null;
     }
-}
-
-function init(meta) {
-    return new Extension(meta.uuid);
 }

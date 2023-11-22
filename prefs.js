@@ -1,23 +1,16 @@
-const ExtensionUtils = imports.misc.extensionUtils;
-const Me = ExtensionUtils.getCurrentExtension();
+import {ConnectionSettingsPage} from './preferences/connection_settings_page.js';
+import {FilterSettingsPage} from './preferences/filter_settings_page.js';
+import {TrackingSettingsPage} from './preferences/tracking_settings_page.js';
+import {NotificationsSettingsPage} from './preferences/notifications_settings_page.js';
 
-const {ConnectionSettingsPage} = Me.imports.preferences.connection_settings_page;
-const {FilterSettingsPage} = Me.imports.preferences.filter_settings_page;
-const {TrackingSettingsPage} = Me.imports.preferences.tracking_settings_page;
-const {NotificationsSettingsPage} = Me.imports.preferences.notifications_settings_page;
+import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-
-/** */
-function init() {
-    ExtensionUtils.initTranslations("tempomate");
-}
-
-/**
- * Populates the preferences window
- */
-function fillPreferencesWindow(window) {
-    window.add(new ConnectionSettingsPage());
-    window.add(new FilterSettingsPage());
-    window.add(new TrackingSettingsPage());
-    window.add(new NotificationsSettingsPage());
+export default class TempomatePreferences extends ExtensionPreferences {
+    fillPreferencesWindow(window) {
+        const settings = this.getSettings();
+        window.add(new ConnectionSettingsPage(settings));
+        window.add(new FilterSettingsPage(settings));
+        window.add(new TrackingSettingsPage(settings));
+        window.add(new NotificationsSettingsPage(settings));
+    }
 }

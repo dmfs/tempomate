@@ -1,6 +1,8 @@
-const {Adw, Gio, GObject, Gtk} = imports.gi;
+import GObject from 'gi://GObject';
+import Adw from 'gi://Adw';
+import Gio from 'gi://Gio';
+import Gtk from 'gi://Gtk';
 
-const ExtensionUtils = imports.misc.extensionUtils;
 
 const JqlObject = GObject.registerClass({
         GTypeName: 'JqlObject',
@@ -15,18 +17,16 @@ const JqlObject = GObject.registerClass({
         }
     });
 
-var FilterSettingsPage = GObject.registerClass({
+export var FilterSettingsPage = GObject.registerClass({
         GTypeName: 'FilterSettingsPage',
     },
     class FilterSettingsPage extends Adw.PreferencesPage {
-        _init() {
+        _init(settings) {
             super._init({
                 title: "JQL",
                 icon_name: 'view-list-symbolic',
                 name: 'FilterSettingsPage'
             });
-
-            const settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.tempomate.dmfs.org');
 
             const group = new Adw.PreferencesGroup({title: "Queries"});
             const label_factory = new Gtk.SignalListItemFactory()
@@ -109,4 +109,3 @@ var FilterSettingsPage = GObject.registerClass({
         }
 
     });
-

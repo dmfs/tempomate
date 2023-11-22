@@ -1,48 +1,49 @@
-const {Adw, GObject, Gtk} = imports.gi;
+import GObject from 'gi://GObject';
+import Adw from 'gi://Adw';
+import Gtk from 'gi://Gtk';
 
-const ExtensionUtils = imports.misc.extensionUtils;
-
-var TrackingSettingsPage = GObject.registerClass({
+export var TrackingSettingsPage = GObject.registerClass({
         GTypeName: 'TrackingSettingsPage',
     },
     class TrackingSettingsPage extends Adw.PreferencesPage {
-        _init() {
+        _init(settings) {
             super._init({
                 title: "Time Tracking",
                 icon_name: 'system-run-symbolic',
                 name: 'JiraSettingsPage'
             });
 
-            const settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.tempomate.dmfs.org');
-
             const group = new Adw.PreferencesGroup({title: "Defaults"});
 
-            const duration = new Gtk.SpinButton({
-                valign: Gtk.Align.CENTER
+            const duration_row = new Adw.SpinRow({
+                title: "Worklog Duration",
+                subtitle: "New or updated work-logs end after this duration (in minutes)",
+                numeric: true,
+                adjustment: new Gtk.Adjustment({
+                    lower: 5,
+                    upper: 480,
+                    "page-increment": 10,
+                    "step-increment": 5,
+                    value: settings.get_int("default-duration")
+                })
             });
-            duration.set_range(5, 480);
-            duration.set_value(settings.get_int("default-duration"));
-            duration.set_increments(5, 5);
-
-            duration.connect('unmap', (widget) => settings.set_int("default-duration", widget.value));
-            const duration_row = new Adw.ActionRow({
-                title: "Worklog Duration (Minutes)"
-            });
-            duration_row.add_suffix(duration);
+            duration_row.connect('unmap', (widget) => settings.set_int("default-duration", widget.value));
             group.add(duration_row);
 
-            const auto_close_gap = new Gtk.SpinButton({
-                valign: Gtk.Align.CENTER
-            });
-            auto_close_gap.set_range(0, 120);
-            auto_close_gap.set_value(settings.get_int("gap-auto-close-minutes"));
-            auto_close_gap.set_increments(1, 5);
 
-            auto_close_gap.connect('unmap', (widget) => settings.set_int("gap-auto-close-minutes", widget.value));
-            const auto_close_gap_row = new Adw.ActionRow({
-                title: "Close gap if less or equal (Minutes)"
+            const auto_close_gap_row = new Adw.SpinRow({
+                title: "Maximum Gap to Close",
+                subtitle: "Gaps between work-logs are automatically closes if less or equal (in minutes)",
+                numeric: true,
+                adjustment: new Gtk.Adjustment({
+                    lower: 0,
+                    upper: 120,
+                    "page-increment": 5,
+                    "step-increment": 1,
+                    value: settings.get_int("gap-auto-close-minutes")
+                })
             });
-            auto_close_gap_row.add_suffix(auto_close_gap);
+            auto_close_gap_row.connect('unmap', (widget) => settings.set_int("gap-auto-close-minutes", widget.value));
             group.add(auto_close_gap_row);
 
             this.add(group);
