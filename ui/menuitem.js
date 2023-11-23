@@ -15,13 +15,13 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
+import GObject from 'gi://GObject';
+import St from 'gi://St';
 
-const {GObject, St} = imports.gi;
-const PopupMenu = imports.ui.popupMenu;
-const PanelMenu = imports.ui.panelMenu;
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 
-var IssueMenuItem = GObject.registerClass(
+export var IssueMenuItem = GObject.registerClass(
     class IssueMenuItem extends PopupMenu.PopupBaseMenuItem {
         _init(issue, summary) {
             super._init({

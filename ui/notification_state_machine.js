@@ -1,14 +1,13 @@
-const Lang = imports.lang;
-const Main = imports.ui.main;
-const MessageTray = imports.ui.messageTray;
-const Mainloop = imports.mainloop;
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
+import GLib from 'gi://GLib';
 
-var NotificationStateMachine = class NotificationStateMachine {
+class NotificationStateMachine {
 
-    constructor(settings = {}) {
+    constructor() {
         this._current_issue = null;
-        this._settings = settings;
+        this._settings = {};
         this._start_idle_timeout();
     }
 
@@ -41,12 +40,12 @@ var NotificationStateMachine = class NotificationStateMachine {
         this._notification.setTransient(false);
         this._notification.setResident(true);
 
-        this._notification.connect("destroy", Lang.bind(this, () => {
+        this._notification.connect("destroy", () => {
             if (this._notification) {
                 this._notification = null;
                 work_stopped_callback()
             }
-        }));
+        });
         this._ensure_notification_source().showNotification(this._notification);
         this._current_issue = issue;
     }
@@ -80,7 +79,7 @@ var NotificationStateMachine = class NotificationStateMachine {
 
             this._notification = new MessageTray.Notification(this._ensure_notification_source(), "⚠️ Your work is not tracked ⚠️");
             this._notification.setTransient(true);
-            this._notification.connect("destroy", Lang.bind(this, () => this._notification = null));
+            this._notification.connect("destroy", () => this._notification = null);
 
             this._ensure_notification_source().showNotification(this._notification);
             this._start_idle_timeout();
@@ -90,13 +89,16 @@ var NotificationStateMachine = class NotificationStateMachine {
     _start_idle_timeout() {
         this._remove_idle_timeout();
         log("submitting idle timeout");
-        this._idle_timeout = Mainloop.timeout_add_seconds(this._settings.idle_notification_interval, Lang.bind(this, this._idle));
+        this._idle_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, this._settings.idle_notification_interval, () => {
+            this._idle();
+            return GLib.SOURCE_CONTINUE;
+        });
     }
 
     _remove_idle_timeout() {
         if (this._idle_timeout) {
             log("dropping idle timeout");
-            Mainloop.source_remove(this._idle_timeout);
+            GLib.Source.remove(this._idle_timeout);
         }
     }
 
@@ -114,7 +116,7 @@ var NotificationStateMachine = class NotificationStateMachine {
         if (!this._notification_source) {
             this._notification_source = new MessageTray.Source("Tempomate", 'system-run-symbolic');
             Main.messageTray.add(this._notification_source);
-            this._notification_source.connect("destroy", Lang.bind(this, () => this._notification_source = null));
+            this._notification_source.connect("destroy", () => this._notification_source = null);
         }
         return this._notification_source;
     }
@@ -126,3 +128,5 @@ var NotificationStateMachine = class NotificationStateMachine {
         this._remove_idle_timeout();
     }
 }
+
+export {NotificationStateMachine}

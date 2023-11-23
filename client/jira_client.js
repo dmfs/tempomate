@@ -1,7 +1,6 @@
-const Lang = imports.lang;
-const Soup = imports.gi.Soup;
+import Soup from 'gi://Soup?version=3.0';
 
-var JiraApi2Client = class JiraApi2Client {
+class JiraApi2Client {
     constructor(base_url, token) {
         this.httpSession = new Soup.Session();
         this.base_url = base_url;
@@ -41,7 +40,7 @@ var JiraApi2Client = class JiraApi2Client {
             log(method + " payload " + JSON.stringify(payload))
         }
 
-        this.httpSession.send_and_read_async(message, 0, null, Lang.bind(this,
+        this.httpSession.send_and_read_async(message, 0, null,
             (source, response_message) => {
                 try {
                     const bytes = this.httpSession.send_and_read_finish(response_message);
@@ -50,6 +49,8 @@ var JiraApi2Client = class JiraApi2Client {
                 } catch (e) {
                     error_handler(e);
                 }
-            }));
+            });
     }
 }
+
+export {JiraApi2Client}

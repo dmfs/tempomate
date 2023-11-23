@@ -1,19 +1,16 @@
-const {Adw, GObject} = imports.gi;
+import GObject from 'gi://GObject';
+import Adw from 'gi://Adw';
 
-const ExtensionUtils = imports.misc.extensionUtils;
-
-var ConnectionSettingsPage = GObject.registerClass({
+export var ConnectionSettingsPage = GObject.registerClass({
         GTypeName: 'ConnectionSettingsPage',
     },
     class ConnectionSettingsPage extends Adw.PreferencesPage {
-        _init() {
+        _init(settings) {
             super._init({
                 title: "Connection",
                 icon_name: 'system-run-symbolic',
                 name: 'JiraSettingsPage'
             });
-
-            const settings = ExtensionUtils.getSettings('org.gnome.shell.extensions.tempomate.dmfs.org');
 
             const group = new Adw.PreferencesGroup({title: "Jira Connection"});
 

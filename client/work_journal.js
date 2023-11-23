@@ -1,11 +1,9 @@
-const Lang = imports.lang;
-
-var WorkJournal = class WorkJournal {
+class WorkJournal {
     constructor(settings, jira_client_supplier, username_supplier) {
         this._settings = settings;
         this._jira_client_supplier = jira_client_supplier;
         this._username_supplier = username_supplier;
-        this._settings_changed_id = settings.connect('changed', Lang.bind(this, this._settings_changed));
+        this._settings_changed_id = settings.connect('changed', this._settings_changed.bind(this));
         this._settings_changed();
 
         const last_work_log = JSON.parse(settings.get_string("most-recent-work-log"));
@@ -97,13 +95,13 @@ var WorkJournal = class WorkJournal {
             "worker": this._username_supplier()
         };
 
-        this._jira_client_supplier()._request(method, path, payload, Lang.bind(this, (response) => {
+        this._jira_client_supplier()._request(method, path, payload, (response) => {
             log(JSON.stringify(response))
             if (Array.isArray(response)) {
                 this._current_work_log = response[0];
             }
             this._settings.set_string("most-recent-work-log", JSON.stringify(this._current_work_log))
-        }));
+        });
     }
 
     // not in use yet
@@ -155,3 +153,6 @@ var WorkJournal = class WorkJournal {
     }
 
 }
+
+
+export {WorkJournal}
