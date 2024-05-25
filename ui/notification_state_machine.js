@@ -25,7 +25,8 @@ class NotificationStateMachine {
         if (this._current_issue === issue) {
             // not a new issue, just update
             if (this._notification) {
-                this._notification.update("Working on " + issue, details);
+                this._notification.set_property("title", "Working on " + issue)
+                this._notification.set_property("body", details);
             }
             return;
         }
@@ -36,9 +37,13 @@ class NotificationStateMachine {
 
         this._dispose_notification();
 
-        this._notification = new MessageTray.Notification(this._ensure_notification_source(), "Working on " + issue, details);
-        this._notification.setTransient(false);
-        this._notification.setResident(true);
+        this._notification = new MessageTray.Notification({
+            source: this._ensure_notification_source(),
+            title: "Working on " + issue,
+            body: details,
+            'is-transient': false,
+            resident: true
+        });
 
         this._notification.connect("destroy", () => {
             if (this._notification) {
@@ -46,7 +51,7 @@ class NotificationStateMachine {
                 work_stopped_callback()
             }
         });
-        this._ensure_notification_source().showNotification(this._notification);
+        this._ensure_notification_source().addNotification(this._notification);
         this._current_issue = issue;
     }
 
@@ -59,11 +64,14 @@ class NotificationStateMachine {
 
         this._dispose_notification();
 
-        const notification = new MessageTray.Notification(this._ensure_notification_source(), "Stopped work on " + this._current_issue);
-        notification.setTransient(true);
-        notification.setResident(false);
+        const notification = new MessageTray.Notification({
+            source: this._ensure_notification_source(),
+            title: "Stopped work on " + this._current_issue,
+            'is-transient': true,
+            resident: false
+        });
 
-        this._ensure_notification_source().showNotification(notification);
+        this._ensure_notification_source().addNotification(notification);
         this._current_issue = null;
 
         this._start_idle_timeout();
@@ -77,11 +85,14 @@ class NotificationStateMachine {
             log("creating idle notification")
             this._dispose_notification();
 
-            this._notification = new MessageTray.Notification(this._ensure_notification_source(), "⚠️ Your work is not tracked ⚠️");
-            this._notification.setTransient(true);
+            this._notification = new MessageTray.Notification({
+                source: this._ensure_notification_source(),
+                title: "⚠️ Your work is not tracked ⚠️",
+                'is-transient': true
+            });
             this._notification.connect("destroy", () => this._notification = null);
 
-            this._ensure_notification_source().showNotification(this._notification);
+            this._ensure_notification_source().addNotification(this._notification);
             this._start_idle_timeout();
         }
     }
@@ -114,7 +125,7 @@ class NotificationStateMachine {
     _ensure_notification_source() {
         // notification sources destroy themselves when the last notification is closed, make sure we create a new one if necessary
         if (!this._notification_source) {
-            this._notification_source = new MessageTray.Source("Tempomate", 'system-run-symbolic');
+            this._notification_source = new MessageTray.Source({title: "Tempomate", iconName: 'system-run-symbolic'});
             Main.messageTray.add(this._notification_source);
             this._notification_source.connect("destroy", () => this._notification_source = null);
         }
