@@ -33,7 +33,7 @@ export var IssueMenuItem = GObject.registerClass(
                 text: issue,
                 style_class: 'issue_label'
             });
-            this.add(this.issue_label);
+            this.add_child(this.issue_label);
             this.label_actor = this.issue_label;
 
             this.summary_label = new St.Label({text: summary});
