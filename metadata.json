@@ -1,9 +1,13 @@
 {
   "name": "Tempomate",
-  "description": "Time Tracker for Tempo",
+  "description": "Time Tracker for Tempo. This Extensions provides a simple Gnome Shell Integration to log your work in the Tempo for Jira Server. Note the cloud version is currently not supported.",
   "uuid": "tempomate@dmfs.org",
   "shell-version": [
     "46"
   ],
+  "version-name": "0.1.0",
+  "donations": {
+    "paypal": "dmfs"
+  },
   "settings-schema": "org.gnome.shell.extensions.tempomate.dmfs.org"
 }
