@@ -15,13 +15,13 @@ To use this extension, configure your server connection and access credentials. 
 At present only API token authentication
 is supported. Please generate an API token in your Jira Profile and paste it into the dialog.
 
-![server connection](https://github.com/dmfs/tempomate/blob/51-update-readme/screenshots/server-connection.png?raw=true)
+![server connection](https://github.com/dmfs/tempomate/blob/main/screenshots/server-connection.png?raw=true)
 
 ### JQL Filters
 
 By default, the extension only shows open issues assigned to you. You can add more filters to show other issues as well.
 
-![jql filters](https://github.com/dmfs/tempomate/blob/51-update-readme/screenshots/jql-filters.png?raw=true)
+![jql filters](https://github.com/dmfs/tempomate/blob/main/screenshots/jql-filters.png?raw=true)
 
 ### Time tracking settings
 
@@ -30,20 +30,20 @@ adds a worklog with the configured duration to Tempo (default 1 hour). If the pr
 couple of minutes before, Tempomate can close the gap by moving the start of the new worklog back to the end of the
 previous one.
 
-![time tracking](https://github.com/dmfs/tempomate/blob/51-update-readme/screenshots/time-tracking.png?raw=true)
+![time tracking](https://github.com/dmfs/tempomate/blob/main/screenshots/time-tracking.png?raw=true)
 
 ### Nag notifications
 
 Tempomate can remind you frequently to log your time if there is no current worklog.
 
-![nag notifications](https://github.com/dmfs/tempomate/blob/51-update-readme/screenshots/nag-notifications.png?raw=true)
+![nag notifications](https://github.com/dmfs/tempomate/blob/main/screenshots/nag-notifications.png?raw=true)
 
 ## Using Tempomate
 
 After configuring Tempomate, you can open the menu in the top right corner and click on the issue you're working on.
 Tempomate automatically adds a worklog with the configured duration.
 
-![popup](https://github.com/dmfs/tempomate/blob/51-update-readme/screenshots/popup.png?raw=true)
+![popup](https://github.com/dmfs/tempomate/blob/main/screenshots/popup.png?raw=true)
 
 You can click another issue at any time to start another worklog for the new issue. If the previous worklog was still
 ongoing at that time, it will be updated to end at that time. If the previous worklog ended less than the configured gap
@@ -52,11 +52,11 @@ time ago, the new worklog will start at the time the previous log ended.
 While a worklog is active, a notification will be shown. Discarding the notification updates the end time of the
 worklog with the current time. In future versions a dedicated button will be provided instead.
 
-![worklog-notification](https://github.com/dmfs/tempomate/blob/51-update-readme/screenshots/worklog-notification.png?raw=true)
+![worklog-notification](https://github.com/dmfs/tempomate/blob/main/screenshots/worklog-notification.png?raw=true)
 
 When no worklog is active and the nag notification is enabled, a notification will be shown at the configured interval.
 
-![nag-notification](https://github.com/dmfs/tempomate/blob/51-update-readme/screenshots/nag-notification.png?raw=true)
+![nag-notification](https://github.com/dmfs/tempomate/blob/main/screenshots/nag-notification.png?raw=true)
 
 ## DBus interface
 
