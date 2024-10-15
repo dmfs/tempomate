@@ -2,4 +2,11 @@
 
 .issue_label {
     font-weight: bold;
+    padding-right: 1ex;
+}
+
+.tooltip {
+    background-color: rgba(0, 0, 0, 0.8);
+    border-radius: 1ex;
+    padding: 2ex;
 }

@@ -106,7 +106,18 @@ const Indicator = GObject.registerClass(
 
             const recent_issues_menu = new PopupMenu.PopupMenuSection()
             for (const issue in this.recent_issues) {
-                recent_issues_menu.addMenuItem(this.generateMenuItem(this.recent_issues[issue]));
+                if (this.recent_issues[issue].key === this._work_journal.current_work()?.key) {
+                    recent_issues_menu.addMenuItem(this.generateMenuItem(this.recent_issues[issue], {
+                        icon: "process-stop-symbolic",
+                        tooltip: "Stop work",
+                        callback: () => {
+                            this.stop_work();
+                            this.menu.close(true);
+                        }
+                    }));
+                } else {
+                    recent_issues_menu.addMenuItem(this.generateMenuItem(this.recent_issues[issue]));
+                }
             }
             this.menu.addMenuItem(recent_issues_menu);
 
@@ -123,9 +134,9 @@ const Indicator = GObject.registerClass(
             }
         }
 
-        generateMenuItem(issue) {
+        generateMenuItem(issue, ...actions) {
             const _this = this;
-            const item = new IssueMenuItem(issue.key, issue.fields.summary);
+            const item = new IssueMenuItem(issue.key, issue.fields.summary, ...actions);
             item.connect('activate', () => this.start_or_continue_work(issue));
             return item;
         }
@@ -180,8 +191,8 @@ const Indicator = GObject.registerClass(
             const current_work = this._work_journal.current_work();
             if (current_work) {
                 const remaining_duration = current_work.start.getTime() + current_work.duration * 1000 - new Date().getTime();
-                this.label.set_text("Working on " + current_work.key + " (" + Math.round((remaining_duration / 60000)) + "m remaining)");
-                this._notification_state_machine.start_work(current_work.key, Math.round((remaining_duration / 60000)) + " minutes remaining", this.stop_work.bind(this));
+                this.label.set_text(current_work.key + " (" + Math.round((remaining_duration / 60000)) + "m remaining)");
+                this._notification_state_machine.start_work(current_work.key, Math.round((remaining_duration / 60000)) + " minutes remaining");
             } else {
                 this.label.set_text("⚠️ Not working on an issue ⚠️");
             }
