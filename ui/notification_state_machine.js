@@ -21,7 +21,7 @@ class NotificationStateMachine {
         }
     }
 
-    start_work(issue, details, work_stopped_callback) {
+    start_work(issue, details, notification_closed_callback) {
         if (this._current_issue === issue) {
             // not a new issue, just update
             if (this._notification) {
@@ -48,7 +48,9 @@ class NotificationStateMachine {
         this._notification.connect("destroy", () => {
             if (this._notification) {
                 this._notification = null;
-                work_stopped_callback()
+                if (notification_closed_callback) {
+                    notification_closed_callback()
+                }
             }
         });
         this._ensure_notification_source().addNotification(this._notification);

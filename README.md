@@ -49,8 +49,7 @@ You can click another issue at any time to start another worklog for the new iss
 ongoing at that time, it will be updated to end at that time. If the previous worklog ended less than the configured gap
 time ago, the new worklog will start at the time the previous log ended.
 
-While a worklog is active, a notification will be shown. Discarding the notification updates the end time of the
-worklog with the current time. In future versions a dedicated button will be provided instead.
+While a worklog is active, a notification will be shown.
 
 ![worklog-notification](https://github.com/dmfs/tempomate/blob/main/screenshots/worklog-notification.png?raw=true)
 
