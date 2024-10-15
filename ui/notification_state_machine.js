@@ -30,11 +30,7 @@ class NotificationStateMachine {
             }
             return;
         }
-
-        log("notifying work on " + issue);
-
         this._remove_idle_timeout();
-
         this._dispose_notification();
 
         this._notification = new MessageTray.Notification({
@@ -48,9 +44,7 @@ class NotificationStateMachine {
         this._notification.connect("destroy", () => {
             if (this._notification) {
                 this._notification = null;
-                if (notification_closed_callback) {
-                    notification_closed_callback()
-                }
+                notification_closed_callback?.()
             }
         });
         this._ensure_notification_source().addNotification(this._notification);
@@ -84,7 +78,6 @@ class NotificationStateMachine {
         log("idle called")
         if (this._settings.idle_notifications && !this._current_issue) {
 
-            log("creating idle notification")
             this._dispose_notification();
 
             this._notification = new MessageTray.Notification({
@@ -101,7 +94,6 @@ class NotificationStateMachine {
 
     _start_idle_timeout() {
         this._remove_idle_timeout();
-        log("submitting idle timeout");
         this._idle_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, this._settings.idle_notification_interval, () => {
             this._idle();
             return GLib.SOURCE_CONTINUE;
@@ -110,14 +102,12 @@ class NotificationStateMachine {
 
     _remove_idle_timeout() {
         if (this._idle_timeout) {
-            log("dropping idle timeout");
             GLib.Source.remove(this._idle_timeout);
         }
     }
 
     _dispose_notification() {
         if (this._notification) {
-            log("notification disposed")
             const old_notification = this._notification;
             this._notification = null;
             old_notification.destroy();
@@ -136,7 +126,8 @@ class NotificationStateMachine {
 
 
     destroy() {
-        log("state machine diposed")
+        this._notification_source?.destroy()
+        this._notification_source = null;
         this._dispose_notification();
         this._remove_idle_timeout();
     }
