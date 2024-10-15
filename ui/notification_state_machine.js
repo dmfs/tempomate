@@ -9,6 +9,7 @@ class NotificationStateMachine {
         this._current_issue = null;
         this._settings = {};
         this._start_idle_timeout();
+        this._snooze_nag_until = undefined;
     }
 
     update_settings(settings) {
@@ -22,6 +23,7 @@ class NotificationStateMachine {
     }
 
     start_work(issue, details, notification_closed_callback) {
+        this._snooze_nag_until = undefined;
         if (this._current_issue === issue) {
             // not a new issue, just update
             if (this._notification) {
@@ -75,7 +77,11 @@ class NotificationStateMachine {
 
 
     _idle() {
-        log("idle called")
+        if (new Date().getTime() < this._snooze_nag_until?.getTime()) {
+            this._start_idle_timeout();
+            return;
+        }
+
         if (this._settings.idle_notifications && !this._current_issue) {
 
             this._dispose_notification();
@@ -86,6 +92,9 @@ class NotificationStateMachine {
                 'is-transient': true
             });
             this._notification.connect("destroy", () => this._notification = null);
+            this._notification.addAction("Snooze for 15 minutes", () => {
+                this._snooze_nag_until = new Date(new Date().getTime() + 15 * 60 * 1000)
+            });
 
             this._ensure_notification_source().addNotification(this._notification);
             this._start_idle_timeout();
@@ -94,10 +103,15 @@ class NotificationStateMachine {
 
     _start_idle_timeout() {
         this._remove_idle_timeout();
-        this._idle_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, this._settings.idle_notification_interval, () => {
-            this._idle();
-            return GLib.SOURCE_CONTINUE;
-        });
+        let now = new Date();
+        this._idle_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT,
+            now < this._snooze_nag_until?.getTime()
+                ? (this._snooze_nag_until.getTime() - now.getTime()) / 1000
+                : this._settings.idle_notification_interval,
+            () => {
+                this._idle();
+                return GLib.SOURCE_CONTINUE;
+            });
     }
 
     _remove_idle_timeout() {
