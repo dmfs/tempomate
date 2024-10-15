@@ -25,7 +25,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {JiraApi2Client} from './client/jira_client.js';
 import {WorkJournal} from './client/work_journal.js';
 import {TempomateService} from './dbus/tempomate_service.js';
-import {IssueMenuItem} from './ui/menuitem.js';
+import {CurrentIssueMenuItem, IssueMenuItem} from './ui/menuitem.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {NotificationStateMachine} from './ui/notification_state_machine.js';
@@ -102,26 +102,38 @@ const Indicator = GObject.registerClass(
             }
             this.menu.removeAll();
 
-            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(_('Recent Issues')));
-
-            const recent_issues_menu = new PopupMenu.PopupMenuSection()
-            for (const issue in this.recent_issues) {
-                if (this.recent_issues[issue].key === this._work_journal.current_work()?.key) {
-                    recent_issues_menu.addMenuItem(this.generateMenuItem(this.recent_issues[issue], {
+            let skip_first = false;
+            if (this.recent_issues[0]?.key === this._work_journal.current_work()?.key) {
+                let current_issue = this.recent_issues[0];
+                this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(_('Current Issue')));
+                const current_issue_menu = new PopupMenu.PopupMenuSection()
+                const item = new CurrentIssueMenuItem(current_issue,
+                    this._work_journal.current_work(),
+                    {
                         icon: "process-stop-symbolic",
                         tooltip: "Stop work",
                         callback: () => {
                             this.stop_work();
                             this.menu.close(true);
                         }
-                    }));
-                } else {
+                    });
+                item.connect('activate', () => this.start_or_continue_work(current_issue));
+                current_issue_menu.addMenuItem(item);
+                this.menu.addMenuItem(current_issue_menu);
+                skip_first = true;
+            }
+
+            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(_('Recent Issues')));
+
+            const recent_issues_menu = new PopupMenu.PopupMenuSection()
+            for (const issue in this.recent_issues) {
+                if (!skip_first || issue > 0) {
                     recent_issues_menu.addMenuItem(this.generateMenuItem(this.recent_issues[issue]));
                 }
             }
             this.menu.addMenuItem(recent_issues_menu);
 
-            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(_('Queries')));
+            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(_('Filters')));
 
             for (const q in this.queries) {
 
@@ -135,8 +147,7 @@ const Indicator = GObject.registerClass(
         }
 
         generateMenuItem(issue, ...actions) {
-            const _this = this;
-            const item = new IssueMenuItem(issue.key, issue.fields.summary, ...actions);
+            const item = new IssueMenuItem(issue, ...actions);
             item.connect('activate', () => this.start_or_continue_work(issue));
             return item;
         }

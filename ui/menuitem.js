@@ -15,40 +15,43 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-import {Tooltip} from "./tooltip.js";
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
+import {IssueBoxLayout} from "./issue_boxlayout.js";
 
 const {Clutter, St, GObject} = imports.gi;
 
 
 export var IssueMenuItem = GObject.registerClass(
     class IssueMenuItem extends PopupMenu.PopupBaseMenuItem {
-        _init(issue, summary, ...actions) {
+        _init(issue, ...actions) {
             super._init({
                 reactive: true,
                 can_focus: true,
             });
-            let box = new St.BoxLayout({vertical: false, x_expand: true, x_align: Clutter.ActorAlign.FILL});
-            box.add_child(new St.Label({text: issue, style_class: 'issue_label'}));
-            box.add_child(new St.Label({text: summary, x_expand: true}));
-            actions.map(action => this._action_button(action)).forEach(actionButton => box.add_child(actionButton))
+            this.add_child(new IssueBoxLayout(issue, ...actions))
+        }
+    });
 
+
+export var CurrentIssueMenuItem = GObject.registerClass(
+    class CurrentIssueMenuItem extends PopupMenu.PopupBaseMenuItem {
+        _init(issue, worklog, ...actions) {
+            super._init({
+                reactive: true,
+                can_focus: true,
+            });
+            let box = new St.BoxLayout({vertical: true, x_expand: true, x_align: Clutter.ActorAlign.FILL});
+            box.add_child(new IssueBoxLayout(issue, ...actions))
+            box.add_child(new St.Label({
+                text: `From ${worklog.start.toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                })} to ${new Date(worklog.start.getTime() + worklog.duration * 1000).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                })}, ends in ${Math.round((worklog.start.getTime() + worklog.duration * 1000 - new Date().getTime()) / 60000)} minutes.`
+            }));
             this.add_child(box)
         }
 
-        _action_button(action) {
-            let button = new St.Button({
-                child: new St.Icon({icon_name: action.icon, style: "height:1.75ex"}),
-                can_focus: true,
-                style_class: 'button',
-                style: 'padding: 0px',
-                reactive: true,
-                y_align: Clutter.ActorAlign.CENTER
-            });
-            button.connect('clicked', action.callback);
-            if (action.tooltip) {
-                new Tooltip(button, action.tooltip)
-            }
-            return button;
-        }
     });
