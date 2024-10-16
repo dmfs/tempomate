@@ -5,9 +5,10 @@
   "shell-version": [
     "46"
   ],
-  "version-name": "0.3.0",
+  "version-name": "0.3.1",
   "donations": {
     "paypal": "dmfs"
   },
+  "url": "https://github.com/dmfs/tempomate",
   "settings-schema": "org.gnome.shell.extensions.tempomate.dmfs.org"
 }
