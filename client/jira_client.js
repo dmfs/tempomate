@@ -1,4 +1,4 @@
-import Soup from 'gi://Soup?version=3.0';
+import Soup from 'gi://Soup';
 
 class JiraApi2Client {
     constructor(base_url, token) {
@@ -8,12 +8,12 @@ class JiraApi2Client {
     }
 
     issue(issue, response_handler, error_handler) {
-        this.get('/rest/api/2/issue/' + encodeURI(issue) + '?fields=id,key,summary', response_handler, error_handler);
+        this.get(`/rest/api/2/issue/${encodeURI(issue)}?fields=id,key,summary`, response_handler, error_handler);
     }
 
     filter(jql, response_handler, error_handler) {
         this.get(
-            '/rest/api/2/search?jql=' + encodeURI(jql) + '&maxResults=30&fields=id,key,summary',
+            `/rest/api/2/search?jql=${encodeURI(jql)}&maxResults=30&fields=id,key,summary`,
             response_handler,
             error_handler);
     }
@@ -37,7 +37,7 @@ class JiraApi2Client {
         if (payload) {
             let utf8Encode = new TextEncoder();
             message.set_request_body_from_bytes("application/json", utf8Encode.encode(JSON.stringify(payload)));
-            log(method + " payload " + JSON.stringify(payload))
+            console.debug(`${method} payload ${JSON.stringify(payload)}`)
         }
 
         this.httpSession.send_and_read_async(message, 0, null,

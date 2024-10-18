@@ -22,12 +22,12 @@ class NotificationStateMachine {
         }
     }
 
-    start_work(issue, details, notification_closed_callback) {
+    start_work(worklog, details, notification_closed_callback) {
         this._snooze_nag_until = undefined;
-        if (this._current_issue === issue) {
+        if (this._current_issue === worklog.issueId()) {
             // not a new issue, just update
             if (this._notification) {
-                this._notification.set_property("title", "Working on " + issue)
+                this._notification.set_property("title", "Working on " + worklog.issueId())
                 this._notification.set_property("body", details);
             }
             return;
@@ -37,7 +37,7 @@ class NotificationStateMachine {
 
         this._notification = new MessageTray.Notification({
             source: this._ensure_notification_source(),
-            title: "Working on " + issue,
+            title: "Working on " + worklog.issueId(),
             body: details,
             'is-transient': false,
             resident: true
@@ -50,7 +50,7 @@ class NotificationStateMachine {
             }
         });
         this._ensure_notification_source().addNotification(this._notification);
-        this._current_issue = issue;
+        this._current_issue = worklog.issueId();
     }
 
 

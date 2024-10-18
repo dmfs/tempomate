@@ -17,9 +17,12 @@
 
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {IssueBoxLayout} from "./issue_boxlayout.js";
+import {hhmmTimeString} from "../date/date.js";
+import {between} from "../date/duration.js";
 
-const {Clutter, St, GObject} = imports.gi;
-
+import St from 'gi://St';
+import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
 
 export var IssueMenuItem = GObject.registerClass(
     class IssueMenuItem extends PopupMenu.PopupBaseMenuItem {
@@ -43,13 +46,7 @@ export var CurrentIssueMenuItem = GObject.registerClass(
             let box = new St.BoxLayout({vertical: true, x_expand: true, x_align: Clutter.ActorAlign.FILL});
             box.add_child(new IssueBoxLayout(issue, ...actions))
             box.add_child(new St.Label({
-                text: `From ${worklog.start.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit"
-                })} to ${new Date(worklog.start.getTime() + worklog.duration * 1000).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit"
-                })}, ends in ${Math.round((worklog.start.getTime() + worklog.duration * 1000 - new Date().getTime()) / 60000)} minutes.`
+                text: `From ${hhmmTimeString(worklog.start())} to ${hhmmTimeString(worklog.end())}, ends in ${between(new Date(), worklog.end()).toMinutes()} minutes.`
             }));
             this.add_child(box)
         }
