@@ -1,27 +1,43 @@
+import {between, Duration} from "../date/duration.js";
+import {addDuration} from "../date/date.js";
+import {fromJsonString, WorkLog} from "./worklog.js";
+
+
 class WorkJournal {
-    constructor(settings, jira_client_supplier, username_supplier) {
+    constructor(settings, jira_client_supplier, username_supplier, worklog_updated_callback) {
         this._settings = settings;
         this._jira_client_supplier = jira_client_supplier;
         this._username_supplier = username_supplier;
         this._settings_changed_id = settings.connect('changed', this._settings_changed.bind(this));
         this._settings_changed();
+        this.worklog_updated_callback = worklog_updated_callback;
 
-        const last_work_log = JSON.parse(settings.get_string("most-recent-work-log"));
-        this._previous_work_log = null;
-        this._current_work_log = last_work_log && new Date().getTime() < new Date(last_work_log.started).getTime() + last_work_log.timeSpentSeconds * 1000 ? last_work_log : null;
-        this._current_work = this._current_work_log ? {
-            key: this._current_work_log.issue.key,
-            start: new Date(last_work_log.started),
-            duration: last_work_log.timeSpentSeconds
-        } : null;
+        const recent_work = settings.get_string("most-recent-work-log");
+        if (recent_work && JSON.parse(recent_work) && ("timeSpentSeconds" in JSON.parse(recent_work))) {
+            // legacy format, to be removed
+            const last_work_log = JSON.parse();
+            this._current_work = fromTempo(last_work_log && new Date().getTime() < new Date(last_work_log.started).getTime() + last_work_log.timeSpentSeconds * 1000
+                ? last_work_log
+                : undefined);
+        } else {
+            // new format
+            const worklog = fromJsonString(recent_work)
+            if (worklog?.end().getTime() < new Date().getTime()) {
+                this._previous_work = worklog;
+                this._current_work = undefined;
+            } else {
+                this._previous_work = undefined;
+                this._current_work = worklog;
+            }
+        }
     }
 
     _settings_changed() {
-        this._gap_auto_close_minutes = JSON.parse(this._settings.get_int("gap-auto-close-minutes"));
+        this._gap_auto_close = new Duration(JSON.parse(this._settings.get_int("gap-auto-close-minutes")) * 60 * 1000);
     }
 
-    start_work(issue, duration = 3600) {
-        if (this._current_work && this._current_work.key !== issue) {
+    start_work(issue, duration, callback) {
+        if (this._current_work && this._current_work.issueId() !== issue) {
             this.stop_work();
         }
 
@@ -29,79 +45,115 @@ class WorkJournal {
 
         if (this._current_work) {
             // continue work
-            this.log_work(issue, this._current_work.start, new Date(now.getTime() + duration * 1000))
-            this._current_work.duration = (now.getTime() - this._current_work.start.getTime()) / 1000 + duration
+            this._current_work = this._current_work.withDuration(between(this._current_work.start(), now).add(duration));
+            this._save_worklog(this._current_work, result => {
+                callback?.(result);
+                this._store_current_work();
+            });
         } else {
-            let start = now;
-            if (this._previous_work_log) {
-                const prev_end = new Date(this._previous_work_log.started).getTime() + this._previous_work_log.timeSpentSeconds * 1000;
-                if (now.getTime() < prev_end + this._gap_auto_close_minutes * 1000 * 60) {
-                    if (this._previous_work_log.issue.key === issue) {
-                        // same issue, just extend the work-log
-                        this._current_work_log = this._previous_work_log;
-                        start = new Date(this._previous_work_log.started)
-                    } else {
-                        // new issue, continue seamlessly
-                        start = new Date(prev_end);
-                        log("dating work back to " + start);
-                    }
+            if (this._previous_work && between(addDuration(this._previous_work.end(), this._gap_auto_close), now).toMillis() < 0) {
+                // gap is small enough, just close it
+                if (this._previous_work.issueId() === issue) {
+                    //just adjust the previous log duration
+                    this._current_work = this._previous_work.withDuration(between(this._previous_work.start(), now).add(duration));
+                    this._previous_work = undefined;
+                    this._save_worklog(this.current_work(), result => {
+                        callback?.(result);
+                        this._store_current_work();
+                    })
+                } else {
+                    // start a new worklog with a start in the past
+                    this._save_worklog(
+                        new WorkLog(this._previous_work.end(),
+                            between(this._previous_work.end(), now).add(duration),
+                            issue),
+                        result => {
+                            this._previous_work = undefined;
+                            this._current_work = result;
+                            callback?.(result);
+                            this._store_current_work();
+                        })
                 }
-            }
-            this.log_work(issue, start, new Date(now.getTime() + duration * 1000))
-            this._current_work = {
-                key: issue,
-                start: now,
-                duration: duration
+            } else {
+                this._current_work = new WorkLog(now, duration, issue);
+                this._save_worklog(this._current_work, result => {
+                    // update with synced worklog
+                    this._current_work = result;
+                    callback?.(result);
+                    this._store_current_work();
+                });
             }
         }
     }
 
-    stop_work() {
+    stop_work(callback) {
         if (this._current_work) {
-            const started = new Date(this._current_work_log.started);
-            const now = new Date();
-            this._previous_work_log = this._current_work_log;
-            this._previous_work_log.timeSpentSeconds = (now.getTime() - started.getTime()) / 1000
-            this.log_work(this._current_work_log.issue.key, started, now);
-            this._current_work_log = null;
-            this._current_work = null;
+            this._previous_work = this._current_work.withDuration(between(this._current_work.start(), new Date()));
+            this._save_worklog(this._previous_work);
+            this._current_work = undefined;
+            callback?.();
+            this._store_current_work();
         }
     }
 
     current_work() {
-        if (this._current_work) {
-            return this._current_work;
-        }
+        return this._current_work;
     }
 
     /*
-      See https://www.tempo.io/server-api-documentation/timesheets#tag/Worklogs/operation/createWorklog
-      */
-    log_work(issue, start, end) {
-        log("logging work for " + issue + " from " + start + " until " + end);
-        let method = "POST";
-        let path = '/rest/tempo-timesheets/4/worklogs';
-        if (this._current_work_log && this._current_work_log.issue.key === issue) {
-            path += "/" + this._current_work_log.tempoWorklogId;
-            method = "PUT";
+     See https://www.tempo.io/server-api-documentation/timesheets#tag/Worklogs/operation/createWorklog
+     */
+    _save_worklog(worklog, callback) {
+        if (worklog.worklogId()) {
+            this._update_worklog(worklog, callback)
+            return;
         }
+        console.debug(`creating worklog for ${worklog.issueId()} from ${worklog.start()} lasting ${worklog.duration().toSeconds()}`);
 
         let payload = {
-            "billableSeconds": Math.round((end.getTime() - start.getTime()) / 1000),
+            "billableSeconds": worklog.duration().toSeconds(),
             "includeNonWorkingDays": false,
-            "originTaskId": issue,
-            "started": this._format_date(start),
-            "timeSpentSeconds": Math.round((end.getTime() - start.getTime()) / 1000),
+            "originTaskId": worklog.issueId(),
+            "started": this._format_date(worklog.start()),
+            "timeSpentSeconds": worklog.duration().toSeconds(),
             "worker": this._username_supplier()
         };
 
-        this._jira_client_supplier()._request(method, path, payload, (response) => {
-            log(JSON.stringify(response))
-            if (Array.isArray(response)) {
-                this._current_work_log = response[0];
-            }
-            this._settings.set_string("most-recent-work-log", JSON.stringify(this._current_work_log))
-        });
+        this._jira_client_supplier().post(
+            '/rest/tempo-timesheets/4/worklogs',
+            payload,
+            response => {
+                console.debug("create worklog response ", JSON.stringify(response));
+                if (Array.isArray(response) && response.length > 0) {
+                    callback?.(fromTempo(response[0]));
+                } else {
+                    callback?.()
+                }
+            });
+    }
+
+    _update_worklog(worklog, callback) {
+        console.debug(`Updating ${worklog}`);
+        if (!worklog.worklogId()) {
+            throw `Can't update new worklog ${worklog}`
+        }
+
+        const payload = {
+            "billableSeconds": worklog.duration().toSeconds(),
+            "includeNonWorkingDays": false,
+            "originTaskId": worklog.issueId(),
+            "started": this._format_date(worklog.start()),
+            "timeSpentSeconds": worklog.duration().toSeconds(),
+            "worker": this._username_supplier()
+        };
+
+        this._jira_client_supplier().put(
+            `/rest/tempo-timesheets/4/worklogs/${worklog.worklogId()}`,
+            payload,
+            response => {
+                console.debug("update worklog response ", JSON.stringify(response));
+                callback?.(fromTempo(response));
+            });
     }
 
     // not in use yet
@@ -114,20 +166,21 @@ class WorkJournal {
             (response) => {
                 if (Array.isArray(response)) {
                     const now = new Date().getTime();
-                    const current = response.find(r => new Date(r.started).getTime() <= now && now < new Date(r.started).getTime() + r.timeSpentSeconds * 1000)
-                    if (current) {
-                        result_handler(current);
-                    }
+                    result_handler(response.find(r => new Date(r.started).getTime() <= now && now < new Date(r.started).getTime() + r.timeSpentSeconds * 1000));
                 }
             });
+    }
+
+    _store_current_work() {
+        console.debug(`Storing current WorkLog: ${(this._current_work || this._previous_work)?.toJsonString()}`)
+        this._settings.set_string("most-recent-work-log", (this._current_work || this._previous_work)?.toJsonString())
     }
 
     destroy() {
         // see https://gitlab.gnome.org/GNOME/gnome-shell/-/issues/2621
         // this isn't called when the user logs out
         // for the time being, we also update the setting every time we update the work-log
-        this._settings.set_string("most-recent-work-log", JSON.stringify(this._current_work_log))
-
+        this._store_current_work();
         this._settings.disconnect(this._settings_changed_id)
     }
 
@@ -154,5 +207,14 @@ class WorkJournal {
 
 }
 
+function fromTempo(worklog) {
+    return worklog
+        ? new WorkLog(
+            new Date(worklog.started),
+            new Duration(worklog.timeSpentSeconds * 1000),
+            worklog.issue.key,
+            worklog.tempoWorklogId)
+        : undefined;
+}
 
-export {WorkJournal}
+export {WorkJournal};

@@ -17,8 +17,9 @@
 
 import {Tooltip} from "./tooltip.js";
 
-const {Clutter, St, GObject} = imports.gi;
-
+import St from 'gi://St';
+import Clutter from 'gi://Clutter';
+import GObject from 'gi://GObject';
 
 export var IssueBoxLayout = GObject.registerClass(
     class IssueBoxLayout extends St.BoxLayout {

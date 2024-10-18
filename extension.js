@@ -20,6 +20,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 import GLib from 'gi://GLib';
+import Clutter from 'gi://Clutter';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {JiraApi2Client} from './client/jira_client.js';
@@ -29,6 +30,7 @@ import {CurrentIssueMenuItem, IssueMenuItem} from './ui/menuitem.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {NotificationStateMachine} from './ui/notification_state_machine.js';
+import {between, Duration} from "./date/duration.js";
 
 const Indicator = GObject.registerClass(
     class Indicator extends PanelMenu.Button {
@@ -37,7 +39,8 @@ const Indicator = GObject.registerClass(
 
             this.label = new St.Label({
                 style_class: 'panel-button',
-                text: '⚠️ Not working on an issue ⚠️'
+                text: '⚠️ Not working on an issue ⚠️',
+                y_align: Clutter.ActorAlign.CENTER
             });
             this.add_child(this.label);
             this.setMenu(new PopupMenu.PopupMenu(this, 0.0, St.Side.TOP, 0));
@@ -53,9 +56,9 @@ const Indicator = GObject.registerClass(
             this.dbus_service = new TempomateService(this.fetch_and_start_or_continue_work.bind(this));
             if (this._work_journal.current_work()) {
                 // set up stop timer if recent work has been restored
-                const remaining = this._work_journal.current_work().start.getTime() / 1000 + this._work_journal.current_work().duration - new Date().getTime() / 1000;
-                if (remaining > 0) {
-                    this.stop_work_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, remaining, () => {
+                const remaining = between(new Date(), this._work_journal.current_work().end());
+                if (remaining.toSeconds() > 0) {
+                    this.stop_work_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, remaining.toSeconds(), () => {
                         this.stop_work();
                         return GLib.SOURCE_REMOVE;
                     });
@@ -100,10 +103,11 @@ const Indicator = GObject.registerClass(
             if (!opened) {
                 return;
             }
+            console.debug("Menu opened -  updating ", this._work_journal.current_work())
             this.menu.removeAll();
 
             let skip_first = false;
-            if (this.recent_issues[0]?.key === this._work_journal.current_work()?.key) {
+            if (this.recent_issues[0]?.key === this._work_journal.current_work()?.issueId()) {
                 let current_issue = this.recent_issues[0];
                 this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(_('Current Issue')));
                 const current_issue_menu = new PopupMenu.PopupMenuSection()
@@ -163,7 +167,7 @@ const Indicator = GObject.registerClass(
             }
             log("starting work " + issue.key)
             this.add_recent_issue(issue);
-            this._work_journal.start_work(issue.key, this.default_duration);
+            this._work_journal.start_work(issue.key, new Duration(this.default_duration * 1000), () => this.update_label());
             if (this.stop_work_timeout) {
                 GLib.Source.remove(this.stop_work_timeout);
             }
@@ -171,7 +175,6 @@ const Indicator = GObject.registerClass(
                 this.stop_work();
                 return GLib.SOURCE_REMOVE;
             })
-            this.update_label();
         }
 
         // Add an issue to recent issues and update the UI
@@ -201,9 +204,9 @@ const Indicator = GObject.registerClass(
         update_label() {
             const current_work = this._work_journal.current_work();
             if (current_work) {
-                const remaining_duration = current_work.start.getTime() + current_work.duration * 1000 - new Date().getTime();
-                this.label.set_text(current_work.key + " (" + Math.round((remaining_duration / 60000)) + "m remaining)");
-                this._notification_state_machine.start_work(current_work.key, Math.round((remaining_duration / 60000)) + " minutes remaining");
+                const remaining_duration = between(new Date(), current_work.end());
+                this.label.set_text(`${current_work.issueId()} (${remaining_duration.toMinutes()}m remaining)`);
+                this._notification_state_machine.start_work(current_work, `${remaining_duration.toMinutes()} minutes remaining`);
             } else {
                 this.label.set_text("⚠️ Not working on an issue ⚠️");
             }
