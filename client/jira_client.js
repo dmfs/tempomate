@@ -43,9 +43,13 @@ class JiraApi2Client {
         this.httpSession.send_and_read_async(message, 0, null,
             (source, response_message) => {
                 try {
-                    const bytes = this.httpSession.send_and_read_finish(response_message);
-                    const decoder = new TextDecoder();
-                    response_handler(JSON.parse(decoder.decode(bytes.get_data())));
+                    if (message.status_code === 200) {
+                        const bytes = this.httpSession.send_and_read_finish(response_message);
+                        const decoder = new TextDecoder();
+                        response_handler(JSON.parse(decoder.decode(bytes.get_data())));
+                    } else {
+                        error_handler(`Received response status code ${message.status_code}`)
+                    }
                 } catch (e) {
                     error_handler(e);
                 }

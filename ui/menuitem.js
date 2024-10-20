@@ -23,6 +23,7 @@ import {between} from "../date/duration.js";
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
+import {Tooltip} from "./tooltip.js";
 
 export var IssueMenuItem = GObject.registerClass(
     class IssueMenuItem extends PopupMenu.PopupBaseMenuItem {
@@ -51,4 +52,45 @@ export var CurrentIssueMenuItem = GObject.registerClass(
             this.add_child(box)
         }
 
+    });
+
+export var EditableMenuItem = GObject.registerClass(
+    class EditableMenuItem extends PopupMenu.PopupBaseMenuItem {
+        _init(...actions) {
+            super._init({
+                reactive: false,
+                can_focus: true,
+            });
+
+            const vertical_layout = new St.BoxLayout({vertical: true, x_expand: true});
+            const inner_layout = new St.BoxLayout({vertical: false, x_expand: true});
+            const entry = new St.Entry({hint_text: "Issue ID", x_expand: true});
+            inner_layout.add_child(entry)
+            actions.map(action => this._action_button(action, () => entry.text))
+                .forEach(actionButton => inner_layout.add_child(actionButton));
+            this.error = new St.Bin();
+            vertical_layout.add_child(inner_layout);
+            vertical_layout.add_child(this.error);
+            this.add_child(vertical_layout);
+        }
+
+        _action_button(action, value_supplier) {
+            let button = new St.Button({
+                child: new St.Icon({icon_name: action.icon, style: "height:1.75ex"}),
+                can_focus: true,
+                style_class: 'button',
+                style: 'padding: 0px; margin-left:4pt',
+                reactive: true,
+                y_align: Clutter.ActorAlign.CENTER
+            });
+            button.connect('clicked', () => action.callback(value_supplier()));
+            if (action.tooltip) {
+                new Tooltip(button, action.tooltip)
+            }
+            return button;
+        }
+
+        set_error(error) {
+            this.error.set_child(new St.Label({text: error, x_expand: true, style: "font-weight:bold; padding-top: 4pt"}));
+        }
     });
