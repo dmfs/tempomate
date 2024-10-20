@@ -92,6 +92,13 @@ Jira and Tempo account in the cloud. If you're interested in Jira + Tempo Cloud 
 [Support Jira + Tempo Cloud](https://github.com/dmfs/tempomate/issues/45), especially if you're able to donate money
 and/or test accounts.
 
+## Sponsor
+
+If Tempomate saves you time, effort or frustration by simplifying time tracking with Tempo Time Sheets, consider
+becoming a sponsor to support its continued development. Your sponsorship helps ensure ongoing maintenance, 
+new features, and smoother integration with GNOME Shell. For individuals or organizations, I can provide invoices
+for contributions.
+
 ## License
 
 Copyright (C) 2024 dmfs GmbH

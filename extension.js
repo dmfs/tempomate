@@ -26,7 +26,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {JiraApi2Client} from './client/jira_client.js';
 import {WorkJournal} from './client/work_journal.js';
 import {TempomateService} from './dbus/tempomate_service.js';
-import {CurrentIssueMenuItem, IssueMenuItem} from './ui/menuitem.js';
+import {CurrentIssueMenuItem, EditableMenuItem, IssueMenuItem} from './ui/menuitem.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {NotificationStateMachine} from './ui/notification_state_machine.js';
@@ -114,7 +114,7 @@ const Indicator = GObject.registerClass(
                 const item = new CurrentIssueMenuItem(current_issue,
                     this._work_journal.current_work(),
                     {
-                        icon: "process-stop-symbolic",
+                        icon: "media-playback-pause-symbolic",
                         tooltip: "Stop work",
                         callback: () => {
                             this.stop_work();
@@ -148,6 +148,19 @@ const Indicator = GObject.registerClass(
                 }
                 this.menu.addMenuItem(section);
             }
+
+            this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(_('Other issues')));
+            const editableMenuItem = new EditableMenuItem({
+                icon: "media-playback-start-symbolic",
+                tooltip: "Start work",
+                callback: issueId => {
+                    this.fetch_and_start_or_continue_work(
+                        issueId,
+                        loaded_issue => this.menu.close(true),
+                        error => editableMenuItem.set_error?.(`Unable to load issue ${issueId}`));
+                }
+            })
+            this.menu.addMenuItem(editableMenuItem);
         }
 
         generateMenuItem(issue, ...actions) {
@@ -156,8 +169,13 @@ const Indicator = GObject.registerClass(
             return item;
         }
 
-        fetch_and_start_or_continue_work(issue) {
-            this.client.issue(issue, this.start_or_continue_work.bind(this))
+        fetch_and_start_or_continue_work(issueId, success_handler, error_handler) {
+            this.client.issue(issueId,
+                jira_issue => {
+                    success_handler?.(jira_issue);
+                    this.start_or_continue_work(jira_issue);
+                },
+                error_handler)
         }
 
 
