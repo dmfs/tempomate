@@ -31,7 +31,7 @@ class WorkLog {
     }
 
     /**
-     * The identifier if the issue this WorkLog belongs to.
+     * The identifier of the issue this WorkLog belongs to.
      */
     issueId() {
         return this._issueId;

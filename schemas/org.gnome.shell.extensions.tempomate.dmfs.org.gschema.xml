@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-    <schema id="org.gnome.shell.extensions.tempomate.dmfs.org" path="/org/gnome/shell/extensions/tempomate.dmfs.org/">
+    <schema id="org.gnome.shell.extensions.tempomate.dmfs.org"
+        path="/org/gnome/shell/extensions/tempomate.dmfs.org/">
         <key name="host" type="s">
             <default>"https://jira.example.com"</default>
             <summary>Jira base URL</summary>
@@ -13,8 +14,33 @@
         </key>
         <key name="token" type="s">
             <default>""</default>
-            <summary>API token</summary>
-            <description>A valid API token</description>
+            <summary>Jira API token</summary>
+            <description>A valid Jira API token</description>
+        </key>
+        <key name="jira-cloud-host" type="s">
+            <default>"https://example.atlassian.net"</default>
+            <summary>Jira Cloud base URL</summary>
+            <description>The base URL of the Jira Cloud Instance.</description>
+        </key>
+        <key name="jira-cloud-username" type="s">
+            <default>""</default>
+            <summary>Username</summary>
+            <description>The username of worklog entries.</description>
+        </key>
+        <key name="jira-cloud-token" type="s">
+            <default>""</default>
+            <summary>Jira API token</summary>
+            <description>A valid Jira API token</description>
+        </key>
+        <key name="tempo-cloud-token" type="s">
+            <default>""</default>
+            <summary>Tempo API token</summary>
+            <description>A valid Tempo API token</description>
+        </key>
+        <key name="deployment-type" type="s">
+            <default>"jira-server"</default>
+            <summary>Deployment Type</summary>
+            <description>The deployment type</description>
         </key>
         <key name="jqls" type="as">
             <default>[
@@ -34,7 +60,8 @@
         <key name="gap-auto-close-minutes" type="i">
             <default>5</default>
             <summary>Close Gap Minutes</summary>
-            <description>Automatically close gaps to previous work-logs if gap is smaller than this number of minutes.
+            <description>Automatically close gaps to previous work-logs if gap is smaller than this
+                number of minutes.
             </description>
         </key>
         <key name="issue-cache" type="s">
@@ -56,7 +83,8 @@
         <key name="nag-notification-interval" type="i">
             <default>300</default>
             <summary>Nag Notification Interval</summary>
-            <description>The interval in seconds at which to show the nag notifications when enabled.</description>
+            <description>The interval in seconds at which to show the nag notifications when
+                enabled.</description>
         </key>
         <key name="most-recent-work-log" type="s">
             <default>"null"</default>

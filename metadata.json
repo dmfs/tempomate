@@ -3,7 +3,7 @@
   "description": "Mindless time tracking in Jira (Server) Tempo time sheets.\n\nThis extension allows you to log your time in Tempo with three mouse clicks or less.\n\nIn addition it can remind you frequently to log your time in case you didn't.\n\nAfter installation, configure the extension with your Jira URL, user name, API token and a couple of JQL filters for the issue categories to show in the menu.\n\nOnly Jira Server is supported right now. Comment on https://github.com/dmfs/tempomate/issues/45 if you need Jira Cloud support.",
   "uuid": "tempomate@dmfs.org",
   "shell-version": [
-    "46"
+    "46", "47"
   ],
   "version-name": "0.4.0",
   "donations": {
