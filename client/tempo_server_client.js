@@ -1,3 +1,5 @@
+import { WorkLog } from "./worklog.js";
+import { Duration } from "../date/duration.js";
 
 class TempoServerClient {
     constructor(rest_client, user_id, token) {
@@ -48,7 +50,7 @@ class TempoServerClient {
     _payload(worklog) {
         return {
             "billableSeconds": worklog.duration().toSeconds(),
-            "includeNonWorkingDays": true,
+            "includeNonWorkingDays": false,
             "originTaskId": worklog.issueId(),
             "started": this._format_date(worklog.start()),
             "timeSpentSeconds": worklog.duration().toSeconds(),
@@ -57,8 +59,8 @@ class TempoServerClient {
     }
 
     _format_date(date) {
-        return `${start.getFullYear()}-${(start.getMonth() + 1).toString().padStart(2, '0')}-${start.getDate().toString().padStart(2, '0')} ` +
-            `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}:${start.getSeconds().toString().padStart(2, '0')}.000`;
+        return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ` +
+            `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}.000`;
     }
 }
 
@@ -67,7 +69,7 @@ function fromTempo(worklog) {
         ? new WorkLog(
             new Date(worklog.started),
             new Duration(worklog.timeSpentSeconds * 1000),
-            worklog.issue.key,
+            worklog.issue.id,
             worklog.tempoWorklogId)
         : undefined;
 }

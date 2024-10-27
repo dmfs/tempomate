@@ -28,20 +28,17 @@ class RestClient {
             console.debug(`${method} payload ${JSON.stringify(payload)}`)
         }
 
-        log(`${method} ${path} ${headers}`)
-
         this.httpSession.send_and_read_async(message, 0, null,
             (source, response_message) => {
                 try {
                     if (message.status_code >= 200 && message.status_code < 300) {
                         const bytes = this.httpSession.send_and_read_finish(response_message);
                         const decoder = new TextDecoder();
-                        log(`Response ${decoder.decode(bytes.get_data())}`)
 
                         response_handler(JSON.parse(decoder.decode(bytes.get_data())));
                     } else {
                         const bytes = this.httpSession.send_and_read_finish(response_message);
-                        log(`Response ${new TextDecoder().decode(bytes.get_data())}`)
+                        console.debug(`Response ${new TextDecoder().decode(bytes.get_data())}`)
                         error_handler(`Received response status code ${message.status_code}`)
                     }
                 } catch (e) {

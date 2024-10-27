@@ -33,7 +33,7 @@ class WorkJournal {
     }
 
     start_work(issueId, duration, callback) {
-        if (this._current_work && this._current_work.issueId() !== issueId) {
+        if (this._current_work && this._current_work.issueId() == issueId) {
             this.stop_work();
         }
 
@@ -49,7 +49,7 @@ class WorkJournal {
         } else {
             if (this._previous_work && between(addDuration(this._previous_work.end(), this._gap_auto_close), now).toMillis() < 0) {
                 // gap is small enough, just close it
-                if (this._previous_work.issueId() === issueId) {
+                if (this._previous_work.issueId() == issueId) {
                     //just adjust the previous log duration
                     this._current_work = this._previous_work.withDuration(between(this._previous_work.start(), now).add(duration));
                     this._previous_work = undefined;
