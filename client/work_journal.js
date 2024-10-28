@@ -33,7 +33,7 @@ class WorkJournal {
     }
 
     start_work(issueId, duration, callback) {
-        if (this._current_work && this._current_work.issueId() == issueId) {
+        if (this._current_work && this._current_work.issueId() != issueId) {
             this.stop_work();
         }
 

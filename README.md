@@ -85,13 +85,6 @@ if [ "${BRANCH_CHECKOUT}" = "1" ] ; then
 fi
 ```
 
-## Jira Cloud Support
-
-Note, Jira Cloud is currently not supported. Mostly, because I'm not using it myself and due to the lack of a
-Jira and Tempo account in the cloud. If you're interested in Jira + Tempo Cloud support please comment on
-[Support Jira + Tempo Cloud](https://github.com/dmfs/tempomate/issues/45), especially if you're able to donate money
-and/or test accounts.
-
 ## Sponsor
 
 If Tempomate saves you time, effort or frustration by simplifying time tracking with Tempo Time Sheets, consider
