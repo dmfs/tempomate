@@ -47,7 +47,6 @@ class TempoCloudClient {
     _payload(worklog) {
         const start = worklog.start();
         return {
-            "billableSeconds": worklog.duration().toSeconds(),
             "issueId": worklog.issueId(),
             "startDate": `${start.getFullYear()}-${(start.getMonth() + 1).toString().padStart(2, '0')}-${start.getDate().toString().padStart(2, '0')}`,
             "startTime": `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}:${start.getSeconds().toString().padStart(2, '0')}`,
