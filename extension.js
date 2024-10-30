@@ -255,7 +255,7 @@ const Indicator = GObject.registerClass(
             }
 
             this._notification_state_machine.destroy();
-            this._work_journal.destroy();
+            this._work_journal?.destroy();
             this.dbus_service.destroy();
             this.settings.disconnect(this._settingsChangedId);
             this.settings = null;
