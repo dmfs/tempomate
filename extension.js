@@ -223,12 +223,33 @@ const Indicator = GObject.registerClass(
         update_label() {
             const current_work = this._work_journal?.current_work();
             if (current_work) {
+                const issue = this.issue_of(current_work);
                 const remaining_duration = between(new Date(), current_work.end());
-                this.label.set_text(`${current_work.issueId()} (${remaining_duration.toMinutes()}m remaining)`);
-                this._notification_state_machine.start_work(current_work, `${remaining_duration.toMinutes()} minutes remaining`);
+                this.label.set_text(`${issue.key} (${remaining_duration.toMinutes()}m remaining)`);
+                this._notification_state_machine.start_work(current_work,
+                    issue,
+                    `${remaining_duration.toMinutes()} minutes remaining`);
             } else {
                 this.label.set_text("⚠️ Not working on an issue ⚠️");
             }
+        }
+
+        issue_of(worklog) {
+            const recent = this.recent_issues.find(issue => issue.id == worklog.issueId())
+            if (recent) {
+                return recent;current
+            }
+
+            const filtered = this.issues.values().flat().find(issue => issue.id == worklog.issueId())
+            if (filtered) {
+                return filtered;
+            }
+
+            // current fallback
+            return ({
+                id: worklog.issueId(),
+                key: "unkown"
+            })
         }
 
         _refreshFilters() {

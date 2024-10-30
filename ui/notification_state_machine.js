@@ -22,12 +22,12 @@ class NotificationStateMachine {
         }
     }
 
-    start_work(worklog, details, notification_closed_callback) {
+    start_work(worklog, issue, details, notification_closed_callback) {
         this._snooze_nag_until = undefined;
         if (this._current_issue === worklog.issueId()) {
             // not a new issue, just update
             if (this._notification) {
-                this._notification.set_property("title", "Working on " + worklog.issueId())
+                this._notification.set_property("title", "Working on " + issue.key)
                 this._notification.set_property("body", details);
             }
             return;
@@ -131,7 +131,7 @@ class NotificationStateMachine {
     _ensure_notification_source() {
         // notification sources destroy themselves when the last notification is closed, make sure we create a new one if necessary
         if (!this._notification_source) {
-            this._notification_source = new MessageTray.Source({title: "Tempomate", iconName: 'system-run-symbolic'});
+            this._notification_source = new MessageTray.Source({ title: "Tempomate", iconName: 'system-run-symbolic' });
             Main.messageTray.add(this._notification_source);
             this._notification_source.connect("destroy", () => this._notification_source = null);
         }
@@ -147,4 +147,4 @@ class NotificationStateMachine {
     }
 }
 
-export {NotificationStateMachine}
+export { NotificationStateMachine }
