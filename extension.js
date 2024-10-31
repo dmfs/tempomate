@@ -31,7 +31,6 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { NotificationStateMachine } from './ui/notification_state_machine.js';
 import { between, Duration } from './date/duration.js';
-import { retrying } from './utils/utils.js';
 
 const Indicator = GObject.registerClass(
     class Indicator extends PanelMenu.Button {
@@ -77,7 +76,7 @@ const Indicator = GObject.registerClass(
             this.default_duration = this.settings.get_int("default-duration") * 60;
             this.queries = this.settings.get_strv('jqls').map((s) => JSON.parse(s));
             this.client = jira_client_from_config(this.settings);
-            this._work_journal = new WorkJournal(this.settings, retrying(this.client.tempo(), 5, new Duration(5000)));
+            this._work_journal = new WorkJournal(this.settings, () => this.client.tempo());
             if (this._work_journal.current_work()) {
                 // set up stop timer if recent work has been restored
                 const remaining = between(new Date(), this._work_journal.current_work().end());

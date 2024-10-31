@@ -1,6 +1,7 @@
 import { between, Duration } from "../date/duration.js";
 import { addDuration } from "../date/date.js";
 import { fromJsonString, WorkLog } from "./worklog.js";
+import { retrying } from '../utils/utils.js';
 
 
 class WorkJournal {
@@ -28,6 +29,13 @@ class WorkJournal {
         }
     }
 
+    async tempo_client() {
+        if (!this._tempo_client) {
+            this._tempo_client = await retrying(this.tempo_client_promise(), 5, Duration.ofSeconds(1))
+        }
+        return Promise.resolve(this._tempo_client);
+    }
+
     _settings_changed() {
         this._gap_auto_close = new Duration(JSON.parse(this._settings.get_int("gap-auto-close-minutes")) * 60 * 1000);
     }
@@ -42,7 +50,7 @@ class WorkJournal {
         if (this._current_work) {
             // continue work
             this._current_work = this._current_work.withDuration(between(this._current_work.start(), now).add(duration));
-            this.tempo_client_promise.then(client => client.save_worklog(this._current_work, result => {
+            this.tempo_client().then(client => client.save_worklog(this._current_work, result => {
                 callback?.(result);
                 this._store_current_work();
             }))
@@ -54,14 +62,14 @@ class WorkJournal {
                     //just adjust the previous log duration
                     this._current_work = this._previous_work.withDuration(between(this._previous_work.start(), now).add(duration));
                     this._previous_work = undefined;
-                    this.tempo_client_promise.then(client => client.save_worklog(this.current_work(), result => {
+                    this.tempo_client().then(client => client.save_worklog(this.current_work(), result => {
                         callback?.(result);
                         this._store_current_work();
                     }))
                         .catch(error => console.debug(`can't update worklog: ${error}`));
                 } else {
                     // start a new worklog with a start in the past
-                    this.tempo_client_promise.then(client => client.save_worklog(
+                    this.tempo_client().then(client => client.save_worklog(
                         new WorkLog(this._previous_work.end(),
                             between(this._previous_work.end(), now).add(duration),
                             issueId),
@@ -75,7 +83,7 @@ class WorkJournal {
                 }
             } else {
                 this._current_work = new WorkLog(now, duration, issueId);
-                this.tempo_client_promise.then(client => client.save_worklog(this._current_work, result => {
+                this.tempo_client().then(client => client.save_worklog(this._current_work, result => {
                     // update with synced worklog
                     this._current_work = result;
                     callback?.(result);
@@ -89,7 +97,8 @@ class WorkJournal {
     stop_work(callback) {
         if (this._current_work) {
             this._previous_work = this._current_work.withDuration(between(this._current_work.start(), new Date()));
-            this.tempo_client_promise.then(client => client.save_worklog(this._previous_work));
+            this.tempo_client().then(client => client.save_worklog(this._previous_work))
+                .catch(error => console.debug(`can't update worklog: ${error}`));
             this._current_work = undefined;
             callback?.();
             this._store_current_work();
