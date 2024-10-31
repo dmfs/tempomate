@@ -201,6 +201,7 @@ const Indicator = GObject.registerClass(
             if (this.recent_issues.unshift(issue) > 5) {
                 this.recent_issues.length = 5;
             }
+            this._save_state();
         }
 
         stop_work() {
