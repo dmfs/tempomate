@@ -31,6 +31,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { NotificationStateMachine } from './ui/notification_state_machine.js';
 import { between, Duration } from './date/duration.js';
+import { retrying } from './utils/utils.js';
 
 const Indicator = GObject.registerClass(
     class Indicator extends PanelMenu.Button {
@@ -76,23 +77,21 @@ const Indicator = GObject.registerClass(
             this.default_duration = this.settings.get_int("default-duration") * 60;
             this.queries = this.settings.get_strv('jqls').map((s) => JSON.parse(s));
             this.client = jira_client_from_config(this.settings);
-            this.client.tempo(
-                tempo => {
-                    this._work_journal = new WorkJournal(this.settings, tempo);
-                    if (this._work_journal.current_work()) {
-                        // set up stop timer if recent work has been restored
-                        const remaining = between(new Date(), this._work_journal.current_work().end());
-                        if (remaining.toSeconds() > 0) {
-                            this.stop_work_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, remaining.toSeconds(), () => {
-                                this.stop_work();
-                                return GLib.SOURCE_REMOVE;
-                            });
-                        }
-                    }
-                    this._refreshFilters();
-                    this.update_label();
-                    this.updateUI(this.menu, true);
-                });
+            this._work_journal = new WorkJournal(this.settings, retrying(this.client.tempo(), 5, new Duration(5000)));
+            if (this._work_journal.current_work()) {
+                // set up stop timer if recent work has been restored
+                const remaining = between(new Date(), this._work_journal.current_work().end());
+                if (remaining.toSeconds() > 0) {
+                    this.stop_work_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, remaining.toSeconds(), () => {
+                        this.stop_work();
+                        this.stop_work_timeout = undefined;
+                        return GLib.SOURCE_REMOVE;
+                    });
+                }
+            }
+            this._refreshFilters();
+            this.update_label();
+            this.updateUI(this.menu, true);
 
             this._notification_state_machine.update_settings({
                 idle_notifications: this.settings.get_boolean("nag-notifications"),
@@ -192,6 +191,7 @@ const Indicator = GObject.registerClass(
             }
             this.stop_work_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, this.default_duration, () => {
                 this.stop_work();
+                this.stop_work_timeout = undefined;
                 return GLib.SOURCE_REMOVE;
             })
         }
