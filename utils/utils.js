@@ -11,13 +11,12 @@ async function timeout(delay) {
 
 async function retrying(promise, count, delay) {
     let attempts = 0;
-    while (attempts < count) {
+    while (true) {
         try {
             return await promise;
         } catch (error) {
             console.debug(`error while waiting for promise ${error}`);
-            attempts++;
-            if (attempts >= maxAttempts) {
+            if (++attempts >= count) {
                 throw new Error("Max retries reached");
             }
             await timeout(delay);
