@@ -48,7 +48,7 @@ const deployments = [
             group.add(host);
 
             const username = new Adw.EntryRow({
-                title: "Username",
+                title: "Email address",
                 text: settings.get_string("jira-cloud-username")
             });
             username.connect('unmap', (widget) => settings.set_string("jira-cloud-username", widget.text));

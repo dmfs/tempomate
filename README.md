@@ -11,9 +11,10 @@ Tempomate needs to be configured before you can start using it.
 ### Server Connection
 
 To use this extension, configure your server connection and access credentials. Normally, the URL base just looks like
-`https://<your-jira-hostname>`
-At present only API token authentication
-is supported. Please generate an API token in your Jira Profile and paste it into the dialog.
+`https://<your-jira-hostname>` for Jira server / Data Center and https://<your-subdomain>.atlassian.net` for Jira Cloud.
+At present, only API token authentication
+is supported. Please generate an API token in your Jira Profile (Jira Cloud: https://id.atlassian.com/manage-profile/security/api-tokens) and paste it into the dialog.
+For Jira Cloud you need to generate a separate Tempo API Token. Note that Tempo API tokens have a maximum validity of 365 days and need to be replaced then.
 
 ![server connection](https://github.com/dmfs/tempomate/blob/main/screenshots/server-connection.png?raw=true)
 

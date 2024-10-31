@@ -47,7 +47,6 @@ class JiraServerClient {
     }
 }
 
-
 class JiraCloudClient {
     constructor(rest_client, username, token, tempo_token) {
         this.rest_client = rest_client;
