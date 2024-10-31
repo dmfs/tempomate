@@ -6,7 +6,7 @@ import GLib from 'gi://GLib';
 class NotificationStateMachine {
 
     constructor() {
-        this._current_issue = null;
+        this._current_issue_key = null;
         this._settings = {};
         this._start_idle_timeout();
         this._snooze_nag_until = undefined;
@@ -15,16 +15,16 @@ class NotificationStateMachine {
     update_settings(settings) {
         const old_settings = this._settings;
         this._settings = settings;
-        if (!this._current_issue &&
+        if (!this._current_issue_key &&
             (old_settings.idle_notifications !== settings.idle_notifications ||
                 old_settings.idle_notification_interval !== settings.idle_notification_interval)) {
             this._start_idle_timeout();
         }
     }
 
-    start_work(worklog, issue, details, notification_closed_callback) {
+    start_work(issue, details, notification_closed_callback) {
         this._snooze_nag_until = undefined;
-        if (this._current_issue === worklog.issueId()) {
+        if (this._current_issue_key === issue.key) {
             // not a new issue, just update
             if (this._notification) {
                 this._notification.set_property("title", "Working on " + issue.key)
@@ -37,7 +37,7 @@ class NotificationStateMachine {
 
         this._notification = new MessageTray.Notification({
             source: this._ensure_notification_source(),
-            title: "Working on " + worklog.issueId(),
+            title: "Working on " + issue.key,
             body: details,
             'is-transient': false,
             resident: true
@@ -50,12 +50,12 @@ class NotificationStateMachine {
             }
         });
         this._ensure_notification_source().addNotification(this._notification);
-        this._current_issue = worklog.issueId();
+        this._current_issue_key = issue.key;
     }
 
 
     stop_work() {
-        if (!this._current_issue) {
+        if (!this._current_issue_key) {
             // nothing to do
             return;
         }
@@ -64,13 +64,13 @@ class NotificationStateMachine {
 
         const notification = new MessageTray.Notification({
             source: this._ensure_notification_source(),
-            title: "Stopped work on " + this._current_issue,
+            title: "Stopped work on " + this._current_issue_key,
             'is-transient': true,
             resident: false
         });
 
         this._ensure_notification_source().addNotification(notification);
-        this._current_issue = null;
+        this._current_issue_key = null;
 
         this._start_idle_timeout();
     }
@@ -82,7 +82,7 @@ class NotificationStateMachine {
             return;
         }
 
-        if (this._settings.idle_notifications && !this._current_issue) {
+        if (this._settings.idle_notifications && !this._current_issue_key) {
 
             this._dispose_notification();
 

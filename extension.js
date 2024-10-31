@@ -226,9 +226,7 @@ const Indicator = GObject.registerClass(
                 const issue = this.issue_of(current_work);
                 const remaining_duration = between(new Date(), current_work.end());
                 this.label.set_text(`${issue.key} (${remaining_duration.toMinutes()}m remaining)`);
-                this._notification_state_machine.start_work(current_work,
-                    issue,
-                    `${remaining_duration.toMinutes()} minutes remaining`);
+                this._notification_state_machine.start_work(issue, `${remaining_duration.toMinutes()} minutes remaining`);
             } else {
                 this.label.set_text("⚠️ Not working on an issue ⚠️");
             }
@@ -237,7 +235,7 @@ const Indicator = GObject.registerClass(
         issue_of(worklog) {
             const recent = this.recent_issues.find(issue => issue.id == worklog.issueId())
             if (recent) {
-                return recent;current
+                return recent;
             }
 
             const filtered = this.issues.values().flat().find(issue => issue.id == worklog.issueId())
