@@ -29,17 +29,17 @@ class JiraServerClient {
 
     issue(issue, response_handler, error_handler) {
         this.rest_client.get(`/rest/api/2/issue/${encodeURI(issue)}?fields=id,key,summary`,
-            [["Authorization", `Bearer ${this.token}`]],
-            response_handler,
-            error_handler);
+            [["Authorization", `Bearer ${this.token}`]])
+            .then(response_handler)
+            .catch(error_handler);
     }
 
     filter(jql, response_handler, error_handler) {
         this.rest_client.get(
             `/rest/api/2/search?jql=${encodeURI(jql)}&maxResults=30&fields=id,key,summary`,
-            [["Authorization", `Bearer ${this.token}`]],
-            response_handler,
-            error_handler);
+            [["Authorization", `Bearer ${this.token}`]])
+            .then(response_handler)
+            .catch(error_handler);
     }
 
     async tempo() {
@@ -58,27 +58,23 @@ class JiraCloudClient {
     issue(issue, response_handler, error_handler) {
         // TODO: use API V3
         this.rest_client.get(`/rest/api/2/issue/${encodeURI(issue)}?fields=id,key,summary`,
-            [["Authorization", `Basic ${this._base64(this.username, this.token)}`]],
-            response_handler,
-            error_handler);
+            [["Authorization", `Basic ${this._base64(this.username, this.token)}`]])
+            .then(response_handler)
+            .catch(error_handler);
     }
 
     filter(jql, response_handler, error_handler) {
         // TODO: use API V3
         this.rest_client.get(
             `/rest/api/2/search?jql=${encodeURI(jql)}&maxResults=30&fields=id,key,summary`,
-            [["Authorization", `Basic ${this._base64(this.username, this.token)}`]],
-            response_handler,
-            error_handler);
+            [["Authorization", `Basic ${this._base64(this.username, this.token)}`]])
+            .then(response_handler)
+            .catch(error_handler);
     }
 
     async tempo() {
-        return new Promise((resolve, reject) =>
-            this.rest_client.get("/rest/api/3/myself",
-                [["Authorization", `Basic ${this._base64(this.username, this.token)}`]],
-                result => resolve?.(new TempoCloudClient(new RestClient("https://api.tempo.io"), result.accountId, this.tempo_token)),
-                error => reject(error))
-        );
+        const result = await this.rest_client.get("/rest/api/3/myself", [["Authorization", `Basic ${this._base64(this.username, this.token)}`]]);
+        return new TempoCloudClient(new RestClient("https://api.tempo.io"), result.accountId, this.tempo_token);
     }
 
     _base64(username, password) {
