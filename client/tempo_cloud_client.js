@@ -15,11 +15,8 @@ class TempoCloudClient {
             throw `Can't update new worklog ${worklog}`
         }
 
-        this.rest_client.put(
-            `/4/worklogs/${worklog.worklogId()}`,
-            [["Authorization", `Bearer ${this.token}`]],
-            this._payload(worklog),
-            response => {
+        this.rest_client.put(`/4/worklogs/${worklog.worklogId()}`, [["Authorization", `Bearer ${this.token}`]], this._payload(worklog))
+            .then(response => {
                 debug("update worklog response ", JSON.stringify(response));
                 callback?.(fromTempo(response));
             });
@@ -35,11 +32,8 @@ class TempoCloudClient {
             return;
         }
 
-        this.rest_client.post(
-            '/4/worklogs',
-            [["Authorization", `Bearer ${this.token}`]],
-            this._payload(worklog),
-            response => {
+        this.rest_client.post('/4/worklogs', [["Authorization", `Bearer ${this.token}`]], this._payload(worklog))
+            .then(response => {
                 debug("create worklog response ", JSON.stringify(response));
                 callback?.(fromTempo(response));
             });
