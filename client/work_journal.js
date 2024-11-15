@@ -2,6 +2,7 @@ import { between, Duration } from "../date/duration.js";
 import { addDuration } from "../date/date.js";
 import { fromJsonString, WorkLog } from "./worklog.js";
 import { retrying } from '../utils/utils.js';
+import { debug } from "../utils/log.js";
 
 
 class WorkJournal {
@@ -54,7 +55,7 @@ class WorkJournal {
                 callback?.(result);
                 this._store_current_work();
             }))
-                .catch(error => console.debug(`can't update worklog: ${error}`));
+                .catch(error => debug(`can't update worklog: ${error}`));
         } else {
             if (this._previous_work && between(addDuration(this._previous_work.end(), this._gap_auto_close), now).toMillis() < 0) {
                 // gap is small enough, just close it
@@ -66,7 +67,7 @@ class WorkJournal {
                         callback?.(result);
                         this._store_current_work();
                     }))
-                        .catch(error => console.debug(`can't update worklog: ${error}`));
+                        .catch(error => debug(`can't update worklog: ${error}`));
                 } else {
                     // start a new worklog with a start in the past
                     this.tempo_client().then(client => client.save_worklog(
@@ -79,7 +80,7 @@ class WorkJournal {
                             callback?.(result);
                             this._store_current_work();
                         }))
-                        .catch(error => console.debug(`can't update worklog: ${error}`));
+                        .catch(error => debug(`can't update worklog: ${error}`));
                 }
             } else {
                 this._current_work = new WorkLog(now, duration, issueId);
@@ -89,7 +90,7 @@ class WorkJournal {
                     callback?.(result);
                     this._store_current_work();
                 }))
-                    .catch(error => console.debug(`can't update worklog: ${error}`));
+                    .catch(error => debug(`can't update worklog: ${error}`));
             }
         }
     }
@@ -98,7 +99,7 @@ class WorkJournal {
         if (this._current_work) {
             this._previous_work = this._current_work.withDuration(between(this._current_work.start(), new Date()));
             this.tempo_client().then(client => client.save_worklog(this._previous_work))
-                .catch(error => console.debug(`can't update worklog: ${error}`));
+                .catch(error => debug(`can't update worklog: ${error}`));
             this._current_work = undefined;
             callback?.();
             this._store_current_work();
@@ -111,7 +112,7 @@ class WorkJournal {
 
     _store_current_work() {
         if (this._current_work || this._previous_work) {
-            console.debug(`Storing current WorkLog: ${(this._current_work || this._previous_work)?.toJsonString()}`)
+            debug(`Storing current WorkLog: ${(this._current_work || this._previous_work)?.toJsonString()}`)
             this._settings.set_string("most-recent-work-log", (this._current_work || this._previous_work)?.toJsonString())
         }
     }

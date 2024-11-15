@@ -31,6 +31,7 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { NotificationStateMachine } from './ui/notification_state_machine.js';
 import { between, Duration } from './date/duration.js';
+import { debug } from './utils/log.js';
 
 const Indicator = GObject.registerClass(
     class Indicator extends PanelMenu.Button {
@@ -102,7 +103,7 @@ const Indicator = GObject.registerClass(
             if (!opened || !this._work_journal) {
                 return;
             }
-            console.debug("Menu opened -  updating ", this._work_journal.current_work())
+            debug("Menu opened -  updating ", this._work_journal.current_work())
             this.menu.removeAll();
 
             let skip_first = false;
@@ -182,7 +183,7 @@ const Indicator = GObject.registerClass(
             if (!issue || !issue.id) {
                 return
             }
-            log("starting work " + issue.key)
+            debug("starting work " + issue.key)
             this.add_recent_issue(issue);
             this._work_journal.start_work(issue.id, new Duration(this.default_duration * 1000), () => this.update_label());
             if (this.stop_work_timeout) {
@@ -209,7 +210,7 @@ const Indicator = GObject.registerClass(
                 // nothing to do
                 return;
             }
-            log("stopping work")
+            debug("stopping work")
             this._notification_state_machine.stop_work();
 
             if (this.stop_work_timeout) {

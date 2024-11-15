@@ -1,5 +1,6 @@
 import { WorkLog } from "./worklog.js";
 import { Duration } from "../date/duration.js";
+import { debug } from "../utils/log.js";
 
 class TempoCloudClient {
     constructor(rest_client, user_id, token) {
@@ -9,7 +10,7 @@ class TempoCloudClient {
     }
 
     _update_worklog(worklog, callback) {
-        console.debug(`Updating ${worklog}`);
+        debug(`Updating ${worklog}`);
         if (!worklog.worklogId()) {
             throw `Can't update new worklog ${worklog}`
         }
@@ -19,7 +20,7 @@ class TempoCloudClient {
             [["Authorization", `Bearer ${this.token}`]],
             this._payload(worklog),
             response => {
-                console.debug("update worklog response ", JSON.stringify(response));
+                debug("update worklog response ", JSON.stringify(response));
                 callback?.(fromTempo(response));
             });
     }
@@ -28,7 +29,7 @@ class TempoCloudClient {
       See https://apidocs.tempo.io/#tag/Worklogs/operation/createWorklog
      */
     save_worklog(worklog, callback) {
-        console.debug(`Saving ${worklog}`);
+        debug(`Saving ${worklog}`);
         if (worklog.worklogId()) {
             this._update_worklog(worklog, callback)
             return;
@@ -39,7 +40,7 @@ class TempoCloudClient {
             [["Authorization", `Bearer ${this.token}`]],
             this._payload(worklog),
             response => {
-                console.debug("create worklog response ", JSON.stringify(response));
+                debug("create worklog response ", JSON.stringify(response));
                 callback?.(fromTempo(response));
             });
     }

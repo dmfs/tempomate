@@ -77,7 +77,7 @@ class NotificationStateMachine {
 
 
     _idle() {
-        if (new Date().getTime() < this._snooze_nag_until?.getTime()) {
+        if (new Date() < this._snooze_nag_until) {
             this._start_idle_timeout();
             return;
         }
@@ -105,7 +105,7 @@ class NotificationStateMachine {
         this._remove_idle_timeout();
         let now = new Date();
         this._idle_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT,
-            now < this._snooze_nag_until?.getTime()
+            now < this._snooze_nag_until
                 ? (this._snooze_nag_until.getTime() - now.getTime()) / 1000
                 : this._settings.idle_notification_interval,
             () => {

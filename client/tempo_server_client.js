@@ -1,5 +1,6 @@
 import { WorkLog } from "./worklog.js";
 import { Duration } from "../date/duration.js";
+import { debug } from "../utils/log.js";
 
 class TempoServerClient {
     constructor(rest_client, user_id, token) {
@@ -9,7 +10,7 @@ class TempoServerClient {
     }
 
     _update_worklog(worklog, callback) {
-        console.debug(`Updating ${worklog}`);
+        debug(`Updating ${worklog}`);
         if (!worklog.worklogId()) {
             throw `Can't update new worklog ${worklog}`
         }
@@ -19,7 +20,7 @@ class TempoServerClient {
             [["Authorization", `Bearer ${this.token}`]],
             this._payload(worklog),
             response => {
-                console.debug("update worklog response ", JSON.stringify(response));
+                debug("update worklog response ", JSON.stringify(response));
                 callback?.(fromTempo(response));
             });
     }
@@ -38,7 +39,7 @@ class TempoServerClient {
             [["Authorization", `Bearer ${this.token}`]],
             this._payload(worklog),
             response => {
-                console.debug("create worklog response ", JSON.stringify(response));
+                debug("create worklog response ", JSON.stringify(response));
                 if (Array.isArray(response) && response.length > 0) {
                     callback?.(fromTempo(response[0]));
                 } else {

@@ -1,4 +1,5 @@
 import GLib from 'gi://GLib';
+import { debug } from './log.js';
 
 async function timeout(delay) {
     return new Promise((resolve, reject) => {
@@ -15,7 +16,7 @@ async function retrying(promise, count, delay) {
         try {
             return await promise;
         } catch (error) {
-            console.debug(`error while waiting for promise ${error}`);
+            debug(`error while waiting for promise ${error}`);
             if (++attempts >= count) {
                 throw new Error("Max retries reached");
             }
