@@ -108,17 +108,27 @@ const Indicator = GObject.registerClass(
 
             let skip_first = false;
             if (this._work_journal.current_work() && this.recent_issues[0]?.id == this._work_journal.current_work().issueId()) {
+                const current_work = this._work_journal.current_work();
                 let current_issue = this.recent_issues[0];
                 this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(_('Current Issue')));
                 const current_issue_menu = new PopupMenu.PopupMenuSection()
                 const item = new CurrentIssueMenuItem(current_issue,
-                    this._work_journal.current_work(),
+                    current_work,
                     {
                         icon: "media-playback-pause-symbolic",
                         tooltip: "Stop work",
                         callback: () => {
                             this.stop_work();
                             this.menu.close(true);
+                        }
+                    },
+                    {
+                        icon: "document-edit-symbolic",
+                        tooltip: "Edit",
+                        callback: () => {
+                            item.edit((start, end) => {
+                                this._work_journal.update(current_work.withStart(start).withEnd(end))
+                            });
                         }
                     });
                 item.connect('activate', () => this.start_or_continue_work(current_issue));

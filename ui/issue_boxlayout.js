@@ -15,7 +15,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-import {Tooltip} from "./tooltip.js";
+import { Tooltip } from "./tooltip.js";
 
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
@@ -29,17 +29,17 @@ export var IssueBoxLayout = GObject.registerClass(
                 x_expand: true,
                 x_align: Clutter.ActorAlign.FILL
             });
-            this.add_child(new St.Label({text: issue.key, style_class: 'issue_label'}));
-            this.add_child(new St.Label({text: issue.fields.summary, x_expand: true}));
+            this.add_child(new St.Label({ text: issue.key, style_class: 'issue_label' }));
+            this.add_child(new St.Label({ text: issue.fields.summary, x_expand: true }));
             actions.map(action => this._action_button(action)).forEach(actionButton => this.add_child(actionButton))
         }
 
         _action_button(action) {
             let button = new St.Button({
-                child: new St.Icon({icon_name: action.icon, style: "height:1.75ex"}),
+                child: new St.Icon({ icon_name: action.icon, style: "height:1.75ex" }),
                 can_focus: true,
                 style_class: 'button',
-                style: 'padding: 0px',
+                style: 'padding: 0px; margin-left:4pt',
                 reactive: true,
                 y_align: Clutter.ActorAlign.CENTER
             });
@@ -47,6 +47,12 @@ export var IssueBoxLayout = GObject.registerClass(
             if (action.tooltip) {
                 new Tooltip(button, action.tooltip)
             }
+            action.config?.(button);
             return button;
+        }
+
+        replace_actions(...actions) {
+            let children = this.get_children().slice(2).forEach(child => this.remove_child(child));
+            actions.map(action => this._action_button(action)).forEach(actionButton => this.add_child(actionButton))
         }
     });

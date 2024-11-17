@@ -20,7 +20,7 @@ class WorkJournal {
         } else {
             // new format
             const worklog = fromJsonString(recent_work)
-            if (worklog?.end().getTime() < new Date().getTime()) {
+            if (worklog?.end() < new Date()) {
                 this._previous_work = worklog;
                 this._current_work = undefined;
             } else {
@@ -39,6 +39,41 @@ class WorkJournal {
 
     _settings_changed() {
         this._gap_auto_close = new Duration(JSON.parse(this._settings.get_int("gap-auto-close-minutes")) * 60 * 1000);
+    }
+
+    update(worklog) {
+        const now = new Date();
+        if (worklog.start() < now && now < worklog.end()) {
+            if (!this._current_work || this._current_work.worklogId() == worklog.worklogId()) {
+                this._current_work = worklog;
+                this.tempo_client()
+                    .then(client => client.save_worklog(this._current_work, result => this._store_current_work()))
+                    .catch(error => debug(`can't update worklog: ${error}`));
+            }
+            else {
+                if (this._current_work.start() < worklog.start() && worklog.end() < this._current_work.end()) {
+                    // adjust previous worklog if it overlaps
+                    // TODO: what to do is the current worklog's start is after the new ones?
+                    this.tempo_client()
+                        .then(client => client.save_worklog(this._current_work.withEnd(worklog.start()), result => this._store_current_work()))
+                        .catch(error => debug(`can't update worklog: ${error}`));
+                }
+                this._current_work = worklog;
+                this.tempo_client()
+                    .then(client => client.save_worklog(this._current_work, result => this._store_current_work()))
+                    .catch(error => debug(`can't update worklog: ${error}`));
+            }
+            // this is the current worklog
+        }
+        else {
+            if (this._current_work?.worklogId() == worklog.worklogId()) {
+                // this worklog is not the active one anymore
+                this._current_work = undefined;
+            }
+            this.tempo_client()
+                .then(client => client.save_worklog(worklog, result => this._store_current_work()))
+                .catch(error => debug(`can't update worklog: ${error}`));
+        }
     }
 
     start_work(issueId, duration, callback) {

@@ -16,14 +16,16 @@
  */
 
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import {IssueBoxLayout} from "./issue_boxlayout.js";
-import {hhmmTimeString} from "../date/date.js";
-import {between} from "../date/duration.js";
+import { IssueBoxLayout } from "./issue_boxlayout.js";
+import { hhmmTimeString } from "../date/date.js";
+import { between } from "../date/duration.js";
 
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
-import {Tooltip} from "./tooltip.js";
+import { Tooltip } from "./tooltip.js";
+import { TimeEditor } from './time_editor.js';
+import { debug } from '../utils/log.js';
 
 export var IssueMenuItem = GObject.registerClass(
     class IssueMenuItem extends PopupMenu.PopupBaseMenuItem {
@@ -44,14 +46,58 @@ export var CurrentIssueMenuItem = GObject.registerClass(
                 reactive: true,
                 can_focus: true,
             });
-            let box = new St.BoxLayout({vertical: true, x_expand: true, x_align: Clutter.ActorAlign.FILL});
-            box.add_child(new IssueBoxLayout(issue, ...actions))
-            box.add_child(new St.Label({
+            this._actions = actions;
+            this.worklog = worklog;
+            this.box = new St.BoxLayout({ vertical: true, x_expand: true, x_align: Clutter.ActorAlign.FILL });
+            this.issueBoxLayout = new IssueBoxLayout(issue, ...actions);
+            this.box.add_child(this.issueBoxLayout);
+
+            this.label = new St.Label({
                 text: `From ${hhmmTimeString(worklog.start())} to ${hhmmTimeString(worklog.end())}, ends in ${between(new Date(), worklog.end()).toMinutes()} minutes.`
-            }));
-            this.add_child(box)
+            })
+            this.box.add_child(this.label);
+            this.add_child(this.box)
         }
 
+        edit(callback) {
+            const startEntry = new TimeEditor(this.worklog.start());
+            const endEntry = new TimeEditor(this.worklog.end());
+            this.reactive = false;
+
+            this.issueBoxLayout.replace_actions({
+                icon: "emblem-ok-symbolic",
+                tooltip: "Apply changes",
+                config: button => {
+                    startEntry.connect('valid', (element, valid) => button.reactive = valid && endEntry.valid);
+                    endEntry.connect('valid', (element, valid) => button.reactive = valid && startEntry.valid
+                    );
+                },
+                callback: () => {
+                    callback(startEntry.update(this.worklog.start()), endEntry.update(this.worklog.end()));
+                }
+            }, {
+                icon: "process-stop-symbolic",
+                tooltip: "Cancel",
+                callback: () => {
+                    this.box.remove_child(this.editor_box);
+                    this.editor_box = null;
+                    this.box.add_child(this.label);
+                    this.reactive = true;
+                    this.issueBoxLayout.replace_actions(...this._actions)
+                }
+            })
+
+            this.box.remove_child(this.label);
+            this.editor_box = new St.BoxLayout({
+                vertical: false, x_expand: true, x_align: Clutter.ActorAlign.FILL
+            });
+            this.editor_box.add_child(new St.Label({ text: "start: ", y_align: Clutter.ActorAlign.CENTER }))
+            this.editor_box.add_child(startEntry);
+            this.editor_box.add_child(new St.Label({ text: " end: ", y_align: Clutter.ActorAlign.CENTER }))
+            this.editor_box.add_child(endEntry);
+
+            this.box.add_child(this.editor_box);
+        }
     });
 
 export var EditableMenuItem = GObject.registerClass(
@@ -62,9 +108,9 @@ export var EditableMenuItem = GObject.registerClass(
                 can_focus: true,
             });
 
-            const vertical_layout = new St.BoxLayout({vertical: true, x_expand: true});
-            const inner_layout = new St.BoxLayout({vertical: false, x_expand: true});
-            const entry = new St.Entry({hint_text: "Issue ID", x_expand: true});
+            const vertical_layout = new St.BoxLayout({ vertical: true, x_expand: true });
+            const inner_layout = new St.BoxLayout({ vertical: false, x_expand: true });
+            const entry = new St.Entry({ hint_text: "Issue ID", x_expand: true });
             inner_layout.add_child(entry)
             actions.map(action => this._action_button(action, () => entry.text))
                 .forEach(actionButton => inner_layout.add_child(actionButton));
@@ -76,7 +122,7 @@ export var EditableMenuItem = GObject.registerClass(
 
         _action_button(action, value_supplier) {
             let button = new St.Button({
-                child: new St.Icon({icon_name: action.icon, style: "height:1.75ex"}),
+                child: new St.Icon({ icon_name: action.icon, style: "height:1.75ex" }),
                 can_focus: true,
                 style_class: 'button',
                 style: 'padding: 0px; margin-left:4pt',
@@ -91,6 +137,6 @@ export var EditableMenuItem = GObject.registerClass(
         }
 
         set_error(error) {
-            this.error.set_child(new St.Label({text: error, x_expand: true, style: "font-weight:bold; padding-top: 4pt"}));
+            this.error.set_child(new St.Label({ text: error, x_expand: true, style: "font-weight:bold; padding-top: 4pt" }));
         }
     });

@@ -1,5 +1,5 @@
-import {addDuration} from "../date/date.js";
-import {Duration} from "../date/duration.js";
+import { addDuration } from "../date/date.js";
+import { between, Duration } from "../date/duration.js";
 
 class WorkLog {
     constructor(start, duration, issueId, worklogId) {
@@ -51,6 +51,21 @@ class WorkLog {
         return new WorkLog(this._start, duration, this._issueId, this._worklogId);
     }
 
+    /**
+       * Returns a new WorkLog like this with an updated end date.
+       */
+    withEnd(end) {
+        return new WorkLog(this._start, between(this._start, end), this._issueId, this._worklogId);
+    }
+
+    /**
+       * Returns a new WorkLog like this with an updated end date.
+       */
+    withStart(start) {
+        return new WorkLog(start, between(start, this.end()), this._issueId, this._worklogId);
+    }
+
+
     toString() {
         return `Worklog for ${this._issueId} from ${this._start} for ${this._duration} millis`;
     }
@@ -75,5 +90,5 @@ function fromJsonString(jsonString) {
         : undefined;
 }
 
-export {WorkLog, fromJsonString};
+export { WorkLog, fromJsonString };
 
