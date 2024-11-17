@@ -10,6 +10,24 @@ async function timeout(delay) {
     });
 }
 
+function interval(initial_delay, interval, callback) {
+    let timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, initial_delay.toMillis(), () => {
+        timeout = GLib.timeout_add(GLib.PRIORITY_DEFAULT, interval.toMillis(), () => {
+            callback?.()
+            return GLib.SOURCE_CONTINUE;
+        });
+        callback?.()
+        return GLib.SOURCE_REMOVE;
+    });
+
+    return () => {
+        if (timeout) {
+            GLib.Source.remove(timeout);
+            timeout = undefined;
+        }
+    };
+}
+
 async function retrying(promise, count, delay) {
     let attempts = 0;
     while (true) {
@@ -25,4 +43,4 @@ async function retrying(promise, count, delay) {
     }
 }
 
-export { retrying }
+export { retrying, interval, timeout }
