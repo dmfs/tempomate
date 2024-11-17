@@ -73,12 +73,19 @@ class JiraCloudClient {
     }
 
     async tempo() {
-        return new Promise((resolve, reject) =>
+        if (this._tempo) {
+            return this._tempo;
+        }
+        this._tempo = new Promise((resolve, reject) =>
             this.rest_client.get("/rest/api/3/myself",
                 [["Authorization", `Basic ${this._base64(this.username, this.token)}`]],
                 result => resolve?.(new TempoCloudClient(new RestClient("https://api.tempo.io"), result.accountId, this.tempo_token)),
-                error => reject(error))
+                error => {
+                    this._tempo = undefined; // retry next time
+                    return reject(error);
+                })
         );
+        return this._tempo;
     }
 
     _base64(username, password) {
