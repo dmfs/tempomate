@@ -2,6 +2,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
 import GLib from 'gi://GLib';
+import { secondsFromNow } from '../date/date.js';
 
 class NotificationStateMachine {
 
@@ -24,7 +25,7 @@ class NotificationStateMachine {
 
     start_work(issue, details, notification_closed_callback) {
         this._snooze_nag_until = undefined;
-        if (this._current_issue_key === issue.key) {
+        if (this._current_issue_key == issue.key) {
             // not a new issue, just update
             if (this._notification) {
                 this._notification.set_property("title", "Working on " + issue.key)
@@ -93,7 +94,7 @@ class NotificationStateMachine {
             });
             this._notification.connect("destroy", () => this._notification = null);
             this._notification.addAction("Snooze for 15 minutes", () => {
-                this._snooze_nag_until = new Date(new Date().getTime() + 15 * 60 * 1000)
+                this._snooze_nag_until = secondsFromNow(15 * 60)
             });
 
             this._ensure_notification_source().addNotification(this._notification);
