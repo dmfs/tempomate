@@ -18,10 +18,14 @@ class Duration {
     add(other_duration) {
         return new Duration(this.millis + other_duration.toMillis());
     }
+
+    static ofSeconds(seconds) {
+        return new Duration(seconds * 1000);
+    }
 }
 
 function between(from, to) {
     return new Duration(to.getTime() - from.getTime());
 }
 
-export {Duration, between}
+export { Duration, between }

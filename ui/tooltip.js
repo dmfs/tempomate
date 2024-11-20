@@ -19,6 +19,7 @@ export var Tooltip = GObject.registerClass(
                         let [x, y] = event.get_coords();
                         this.set_position(x, y);
                         this.show();
+                        this.tooltip_timeout = undefined;
                         return GLib.SOURCE_REMOVE;
                     });
             });

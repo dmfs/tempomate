@@ -1,3 +1,5 @@
+import { Duration } from "./duration.js";
+
 function startOfDay(date) {
     const result = new Date(date);
     result.setHours(0, 0, 0, 0);
@@ -27,4 +29,8 @@ function hhmmTimeString(date) {
     })
 }
 
-export {startOfDay, dayAfter, dayBefore, addDuration, hhmmTimeString}
+function secondsFromNow(seconds) {
+    return addDuration(new Date(), Duration.ofSeconds(seconds))
+}
+
+export { startOfDay, dayAfter, dayBefore, addDuration, hhmmTimeString, secondsFromNow }

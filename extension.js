@@ -15,7 +15,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import GObject from 'gi://GObject';
 import St from 'gi://St';
@@ -23,14 +23,15 @@ import GLib from 'gi://GLib';
 import Clutter from 'gi://Clutter';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import {JiraApi2Client} from './client/jira_client.js';
-import {WorkJournal} from './client/work_journal.js';
-import {TempomateService} from './dbus/tempomate_service.js';
-import {CurrentIssueMenuItem, EditableMenuItem, IssueMenuItem} from './ui/menuitem.js';
+import { jira_client_from_config } from './client/jira_client.js';
+import { WorkJournal } from './client/work_journal.js';
+import { TempomateService } from './dbus/tempomate_service.js';
+import { CurrentIssueMenuItem, EditableMenuItem, IssueMenuItem } from './ui/menuitem.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import {NotificationStateMachine} from './ui/notification_state_machine.js';
-import {between, Duration} from "./date/duration.js";
+import { NotificationStateMachine } from './ui/notification_state_machine.js';
+import { between, Duration } from './date/duration.js';
+import { debug } from './utils/log.js';
 
 const Indicator = GObject.registerClass(
     class Indicator extends PanelMenu.Button {
@@ -45,25 +46,14 @@ const Indicator = GObject.registerClass(
             this.add_child(this.label);
             this.setMenu(new PopupMenu.PopupMenu(this, 0.0, St.Side.TOP, 0));
             this.settings = settings;
-            this._work_journal = new WorkJournal(this.settings, () => this.client, () => this.username);
             this._notification_state_machine = new NotificationStateMachine();
             this._restore()
             this._settingsChangedId = this.settings.connect('changed', this._settingsChanged.bind(this));
             this._settingsChanged();
-            this.update_label();
-            this.updateUI(this.menu, true);
+
             this.menu.connect("open-state-changed", this.updateUI.bind(this))
             this.dbus_service = new TempomateService(this.fetch_and_start_or_continue_work.bind(this));
-            if (this._work_journal.current_work()) {
-                // set up stop timer if recent work has been restored
-                const remaining = between(new Date(), this._work_journal.current_work().end());
-                if (remaining.toSeconds() > 0) {
-                    this.stop_work_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, remaining.toSeconds(), () => {
-                        this.stop_work();
-                        return GLib.SOURCE_REMOVE;
-                    });
-                }
-            }
+
 
             this._timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 60, () => {
                 this.update_label();
@@ -86,28 +76,38 @@ const Indicator = GObject.registerClass(
         _settingsChanged() {
             this.default_duration = this.settings.get_int("default-duration") * 60;
             this.queries = this.settings.get_strv('jqls').map((s) => JSON.parse(s));
-            this.host = this.settings.get_string('host');
-            this.username = this.settings.get_string('username');
-            this.token = this.settings.get_string('token');
-            this.client = new JiraApi2Client(this.host, this.token);
+            this.client = jira_client_from_config(this.settings);
+            this._work_journal = new WorkJournal(this.settings, () => this.client.tempo());
+            if (this._work_journal.current_work()) {
+                // set up stop timer if recent work has been restored
+                const remaining = between(new Date(), this._work_journal.current_work().end());
+                if (remaining.toSeconds() > 0) {
+                    this.stop_work_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, remaining.toSeconds(), () => {
+                        this.stop_work();
+                        this.stop_work_timeout = undefined;
+                        return GLib.SOURCE_REMOVE;
+                    });
+                }
+            }
+            this._refreshFilters();
+            this.update_label();
+            this.updateUI(this.menu, true);
 
             this._notification_state_machine.update_settings({
                 idle_notifications: this.settings.get_boolean("nag-notifications"),
                 idle_notification_interval: this.settings.get_int("nag-notification-interval")
             })
-
-            this._refreshFilters();
         }
 
         updateUI(menu, opened) {
-            if (!opened) {
+            if (!opened || !this._work_journal) {
                 return;
             }
-            console.debug("Menu opened -  updating ", this._work_journal.current_work())
+            debug("Menu opened -  updating ", this._work_journal.current_work())
             this.menu.removeAll();
 
             let skip_first = false;
-            if (this.recent_issues[0]?.key === this._work_journal.current_work()?.issueId()) {
+            if (this._work_journal.current_work() && this.recent_issues[0]?.id == this._work_journal.current_work().issueId()) {
                 let current_issue = this.recent_issues[0];
                 this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem(_('Current Issue')));
                 const current_issue_menu = new PopupMenu.PopupMenuSection()
@@ -169,8 +169,8 @@ const Indicator = GObject.registerClass(
             return item;
         }
 
-        fetch_and_start_or_continue_work(issueId, success_handler, error_handler) {
-            this.client.issue(issueId,
+        fetch_and_start_or_continue_work(issueKey, success_handler, error_handler) {
+            this.client.issue(issueKey,
                 jira_issue => {
                     success_handler?.(jira_issue);
                     this.start_or_continue_work(jira_issue);
@@ -180,35 +180,37 @@ const Indicator = GObject.registerClass(
 
 
         start_or_continue_work(issue) {
-            if (!issue || !issue.key) {
+            if (!issue || !issue.id) {
                 return
             }
-            log("starting work " + issue.key)
+            debug("starting work " + issue.key)
             this.add_recent_issue(issue);
-            this._work_journal.start_work(issue.key, new Duration(this.default_duration * 1000), () => this.update_label());
+            this._work_journal.start_work(issue.id, new Duration(this.default_duration * 1000), () => this.update_label());
             if (this.stop_work_timeout) {
                 GLib.Source.remove(this.stop_work_timeout);
             }
             this.stop_work_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, this.default_duration, () => {
                 this.stop_work();
+                this.stop_work_timeout = undefined;
                 return GLib.SOURCE_REMOVE;
             })
         }
 
         // Add an issue to recent issues and update the UI
         add_recent_issue(issue) {
-            this.recent_issues = this.recent_issues.filter((e) => e.key !== issue.key);
+            this.recent_issues = this.recent_issues.filter((e) => e.id !== issue.id);
             if (this.recent_issues.unshift(issue) > 5) {
                 this.recent_issues.length = 5;
             }
+            this._save_state();
         }
 
         stop_work() {
-            if (!this._work_journal.current_work()) {
+            if (!this._work_journal?.current_work()) {
                 // nothing to do
                 return;
             }
-            log("stopping work")
+            debug("stopping work")
             this._notification_state_machine.stop_work();
 
             if (this.stop_work_timeout) {
@@ -220,14 +222,33 @@ const Indicator = GObject.registerClass(
         }
 
         update_label() {
-            const current_work = this._work_journal.current_work();
+            const current_work = this._work_journal?.current_work();
             if (current_work) {
+                const issue = this.issue_of(current_work);
                 const remaining_duration = between(new Date(), current_work.end());
-                this.label.set_text(`${current_work.issueId()} (${remaining_duration.toMinutes()}m remaining)`);
-                this._notification_state_machine.start_work(current_work, `${remaining_duration.toMinutes()} minutes remaining`);
+                this.label.set_text(`${issue.key} (${remaining_duration.toMinutes()}m remaining)`);
+                this._notification_state_machine.start_work(issue, `${remaining_duration.toMinutes()} minutes remaining`);
             } else {
                 this.label.set_text("⚠️ Not working on an issue ⚠️");
             }
+        }
+
+        issue_of(worklog) {
+            const recent = this.recent_issues.find(issue => issue.id == worklog.issueId())
+            if (recent) {
+                return recent;
+            }
+
+            const filtered = this.issues.values().flat().find(issue => issue.id == worklog.issueId())
+            if (filtered) {
+                return filtered;
+            }
+
+            // current fallback
+            return ({
+                id: worklog.issueId(),
+                key: "unkown"
+            })
         }
 
         _refreshFilters() {
@@ -254,7 +275,7 @@ const Indicator = GObject.registerClass(
             }
 
             this._notification_state_machine.destroy();
-            this._work_journal.destroy();
+            this._work_journal?.destroy();
             this.dbus_service.destroy();
             this.settings.disconnect(this._settingsChangedId);
             this.settings = null;
