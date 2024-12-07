@@ -32,6 +32,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { NotificationStateMachine } from './ui/notification_state_machine.js';
 import { between, Duration } from './date/duration.js';
 import { debug } from './utils/log.js';
+import { destroy as destroy_timers } from './utils/utils.js';
 
 const Indicator = GObject.registerClass(
     class Indicator extends PanelMenu.Button {
@@ -279,6 +280,9 @@ const Indicator = GObject.registerClass(
             this.dbus_service.destroy();
             this.settings.disconnect(this._settingsChangedId);
             this.settings = null;
+
+            destroy_timers();
+
             super.destroy();
         }
 
