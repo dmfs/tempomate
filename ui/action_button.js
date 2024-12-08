@@ -18,18 +18,25 @@
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
-import { ActionButton } from "./action_button.js";
+import { Tooltip } from "./tooltip.js";
 
-export var IssueBoxLayout = GObject.registerClass(
-    class IssueBoxLayout extends St.BoxLayout {
-        _init(issue, ...actions) {
+export var ActionButton = GObject.registerClass(
+    class ActionButton extends St.Button {
+        _init(action, callback_param_supplier) {
             super._init({
-                vertical: false,
-                x_expand: true,
-                x_align: Clutter.ActorAlign.FILL
+                child: action.icon
+                    ? new St.Icon({ icon_name: action.icon, style: "height:1.75ex" })
+                    : new St.Label({ text: action.text, style: "margin:0,1ex" }),
+                reactive: true,
+                can_focus: true,
+                style_class: 'button',
+                style: 'padding: 0px; margin-left:4pt',
+                y_align: Clutter.ActorAlign.CENTER
             });
-            this.add_child(new St.Label({ text: issue.key, style_class: 'issue_label' }));
-            this.add_child(new St.Label({ text: issue.fields.summary, x_expand: true }));
-            actions.map(action => new ActionButton(action)).forEach(actionButton => this.add_child(actionButton))
+
+            this.connect('clicked', () => action.callback(callback_param_supplier?.()));
+            if (action.tooltip) {
+                new Tooltip(this, action.tooltip)
+            }
         }
     });
