@@ -16,14 +16,14 @@
  */
 
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import {IssueBoxLayout} from "./issue_boxlayout.js";
-import {hhmmTimeString} from "../date/date.js";
-import {between} from "../date/duration.js";
+import { IssueBoxLayout } from "./issue_boxlayout.js";
+import { hhmmTimeString } from "../date/date.js";
+import { between } from "../date/duration.js";
 
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
-import {Tooltip} from "./tooltip.js";
+import { Tooltip } from "./tooltip.js";
 
 export var IssueMenuItem = GObject.registerClass(
     class IssueMenuItem extends PopupMenu.PopupBaseMenuItem {
@@ -44,7 +44,7 @@ export var CurrentIssueMenuItem = GObject.registerClass(
                 reactive: true,
                 can_focus: true,
             });
-            let box = new St.BoxLayout({vertical: true, x_expand: true, x_align: Clutter.ActorAlign.FILL});
+            let box = new St.BoxLayout({ vertical: true, x_expand: true, x_align: Clutter.ActorAlign.FILL });
             box.add_child(new IssueBoxLayout(issue, ...actions))
             box.add_child(new St.Label({
                 text: `From ${hhmmTimeString(worklog.start())} to ${hhmmTimeString(worklog.end())}, ends in ${between(new Date(), worklog.end()).toMinutes()} minutes.`
@@ -62,9 +62,9 @@ export var EditableMenuItem = GObject.registerClass(
                 can_focus: true,
             });
 
-            const vertical_layout = new St.BoxLayout({vertical: true, x_expand: true});
-            const inner_layout = new St.BoxLayout({vertical: false, x_expand: true});
-            const entry = new St.Entry({hint_text: "Issue ID", x_expand: true});
+            const vertical_layout = new St.BoxLayout({ vertical: true, x_expand: true });
+            const inner_layout = new St.BoxLayout({ vertical: false, x_expand: true });
+            const entry = new St.Entry({ hint_text: "Issue ID", x_expand: true });
             inner_layout.add_child(entry)
             actions.map(action => this._action_button(action, () => entry.text))
                 .forEach(actionButton => inner_layout.add_child(actionButton));
@@ -76,7 +76,7 @@ export var EditableMenuItem = GObject.registerClass(
 
         _action_button(action, value_supplier) {
             let button = new St.Button({
-                child: new St.Icon({icon_name: action.icon, style: "height:1.75ex"}),
+                child: new St.Icon({ icon_name: action.icon, style: "height:1.75ex" }),
                 can_focus: true,
                 style_class: 'button',
                 style: 'padding: 0px; margin-left:4pt',
@@ -91,6 +91,26 @@ export var EditableMenuItem = GObject.registerClass(
         }
 
         set_error(error) {
-            this.error.set_child(new St.Label({text: error, x_expand: true, style: "font-weight:bold; padding-top: 4pt"}));
+            this.error.set_child(new St.Label({ text: error, x_expand: true, style: "font-weight:bold; padding-top: 4pt" }));
         }
     });
+
+export var IdleMenuItem = GObject.registerClass(
+    class IdleMenuItem extends PopupMenu.PopupBaseMenuItem {
+        _init(snoozed_until) {
+            super._init({
+                reactive: false,
+                can_focus: false,
+            });
+
+            let text;
+            if (snoozed_until) {
+                text = `Not working on an issue until ${hhmmTimeString(snoozed_until)} 😴`
+            }
+            else {
+                text = "Not working on an issue 😎"
+            }
+            this.add_child(new St.Label({ text: text }));
+        }
+    });
+

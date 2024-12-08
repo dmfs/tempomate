@@ -79,6 +79,9 @@ class NotificationStateMachine {
         this._start_idle();
     }
 
+    snoozed_until() {
+        return this._snooze_nag_until;
+    }
 
     _show_idle_notification() {
         this._dispose_notification();
