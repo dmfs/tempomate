@@ -26,7 +26,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { jira_client_from_config } from './client/jira_client.js';
 import { WorkJournal } from './client/work_journal.js';
 import { TempomateService } from './dbus/tempomate_service.js';
-import { CurrentIssueMenuItem, EditableMenuItem, IssueMenuItem } from './ui/menuitem.js';
+import { CurrentIssueMenuItem, EditableMenuItem, IdleMenuItem, IssueMenuItem } from './ui/menuitem.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { NotificationStateMachine } from './ui/notification_state_machine.js';
@@ -108,11 +108,7 @@ const Indicator = GObject.registerClass(
             this.menu.removeAll();
 
             if (!this._work_journal.current_work()) {
-                this.menu.addMenuItem(new PopupMenu.PopupMenuItem('Not working on an issue 😴',
-                    {
-                        reactive: false,
-                        can_focus: false,
-                    }));
+                this.menu.addMenuItem(new IdleMenuItem(this._notification_state_machine.snoozed_until()));
             }
 
             let skip_first = false;
