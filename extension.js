@@ -107,6 +107,14 @@ const Indicator = GObject.registerClass(
             debug("Menu opened -  updating ", this._work_journal.current_work())
             this.menu.removeAll();
 
+            if (!this._work_journal.current_work()) {
+                this.menu.addMenuItem(new PopupMenu.PopupMenuItem('Not working on an issue 😴',
+                    {
+                        reactive: false,
+                        can_focus: false,
+                    }));
+            }
+
             let skip_first = false;
             if (this._work_journal.current_work() && this.recent_issues[0]?.id == this._work_journal.current_work().issueId()) {
                 let current_issue = this.recent_issues[0];
@@ -281,8 +289,6 @@ const Indicator = GObject.registerClass(
             this.settings.disconnect(this._settingsChangedId);
             this.settings = null;
 
-            destroy_timers();
-
             super.destroy();
         }
 
@@ -305,5 +311,6 @@ export default class TempomateExtension extends Extension {
     disable() {
         this._indicator?.destroy();
         this._indicator = null;
+        destroy_timers();
     }
 }
