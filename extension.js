@@ -108,7 +108,16 @@ const Indicator = GObject.registerClass(
             this.menu.removeAll();
 
             if (!this._work_journal.current_work()) {
-                this.menu.addMenuItem(new IdleMenuItem(this._notification_state_machine.snoozed_until()));
+                this.menu.addMenuItem(new IdleMenuItem(this._notification_state_machine.snoozed_until(),
+                    {
+                        text: "😴+15m",
+                        tooltip: "Snooze for 15 more minutes",
+                        callback: () => {
+                            this._notification_state_machine.add_snooze();
+                            this.menu.close(true);
+                        }
+                    }
+                ));
             }
 
             let skip_first = false;

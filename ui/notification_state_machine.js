@@ -2,7 +2,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
 import GLib from 'gi://GLib';
-import { secondsFromNow } from '../date/date.js';
+import { addDuration, secondsFromNow } from '../date/date.js';
 import { interval } from '../utils/utils.js';
 import { between, Duration } from '../date/duration.js';
 
@@ -82,6 +82,12 @@ class NotificationStateMachine {
     snoozed_until() {
         return this._snooze_nag_until;
     }
+
+    add_snooze(duration = Duration.ofSeconds(15 * 60)) {
+        this._snooze_nag_until = addDuration(this._snooze_nag_until || new Date(), duration)
+        this._start_idle();
+    }
+
 
     _show_idle_notification() {
         this._dispose_notification();

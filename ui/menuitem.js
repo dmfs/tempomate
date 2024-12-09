@@ -23,7 +23,7 @@ import { between } from "../date/duration.js";
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
-import { Tooltip } from "./tooltip.js";
+import { ActionButton } from './action_button.js';
 
 export var IssueMenuItem = GObject.registerClass(
     class IssueMenuItem extends PopupMenu.PopupBaseMenuItem {
@@ -66,28 +66,12 @@ export var EditableMenuItem = GObject.registerClass(
             const inner_layout = new St.BoxLayout({ vertical: false, x_expand: true });
             const entry = new St.Entry({ hint_text: "Issue ID", x_expand: true });
             inner_layout.add_child(entry)
-            actions.map(action => this._action_button(action, () => entry.text))
+            actions.map(action => new ActionButton(action, () => entry.text))
                 .forEach(actionButton => inner_layout.add_child(actionButton));
             this.error = new St.Bin();
             vertical_layout.add_child(inner_layout);
             vertical_layout.add_child(this.error);
             this.add_child(vertical_layout);
-        }
-
-        _action_button(action, value_supplier) {
-            let button = new St.Button({
-                child: new St.Icon({ icon_name: action.icon, style: "height:1.75ex" }),
-                can_focus: true,
-                style_class: 'button',
-                style: 'padding: 0px; margin-left:4pt',
-                reactive: true,
-                y_align: Clutter.ActorAlign.CENTER
-            });
-            button.connect('clicked', () => action.callback(value_supplier()));
-            if (action.tooltip) {
-                new Tooltip(button, action.tooltip)
-            }
-            return button;
         }
 
         set_error(error) {
@@ -97,7 +81,7 @@ export var EditableMenuItem = GObject.registerClass(
 
 export var IdleMenuItem = GObject.registerClass(
     class IdleMenuItem extends PopupMenu.PopupBaseMenuItem {
-        _init(snoozed_until) {
+        _init(snoozed_until, ...actions) {
             super._init({
                 reactive: false,
                 can_focus: false,
@@ -105,12 +89,19 @@ export var IdleMenuItem = GObject.registerClass(
 
             let text;
             if (snoozed_until) {
-                text = `Not working on an issue until ${hhmmTimeString(snoozed_until)} 😴`
+                text = `Not working on an issue until ${hhmmTimeString(snoozed_until)} `
             }
             else {
-                text = "Not working on an issue 😎"
+                text = "Not working on an issue"
             }
-            this.add_child(new St.Label({ text: text }));
+            const box_layout = new St.BoxLayout({ vertical: false, x_expand: true });
+
+            box_layout.add_child(new St.Label({ text: text, x_expand: true }));
+
+            actions.map(action => new ActionButton(action))
+                .forEach(actionButton => box_layout.add_child(actionButton));
+
+            this.add_child(box_layout);
         }
     });
 
