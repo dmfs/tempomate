@@ -88,7 +88,7 @@ export var IdleMenuItem = GObject.registerClass(
             });
 
             let text;
-            if (snoozed_until) {
+            if (new Date() < snoozed_until) {
                 text = `Not working on an issue until ${hhmmTimeString(snoozed_until)} `
             }
             else {
