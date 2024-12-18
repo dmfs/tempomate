@@ -1,7 +1,6 @@
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
-import GLib from 'gi://GLib';
 import { addDuration, secondsFromNow } from '../date/date.js';
 import { interval } from '../utils/utils.js';
 import { between, Duration } from '../date/duration.js';
@@ -27,7 +26,7 @@ class NotificationStateMachine {
 
     start_work(issue, details, notification_closed_callback) {
         this._snooze_nag_until = undefined;
-        this._stop_idle?.();
+        this.nag_notification_interval?.();
 
         if (this._current_issue_key == issue.key) {
             // not a new issue, just update
@@ -107,14 +106,15 @@ class NotificationStateMachine {
     }
 
     _start_idle() {
-        this._stop_idle?.();
+        this.nag_notification_interval?.();
         if (this._settings.idle_notifications && !this._current_issue_key) {
-            this._stop_idle = interval(
+            this.nag_notification_interval = interval(
                 new Date() < this._snooze_nag_until
                     ? between(new Date(), this._snooze_nag_until)
                     : Duration.ofSeconds(this._settings.idle_notification_interval),
                 Duration.ofSeconds(this._settings.idle_notification_interval),
-                () => this._show_idle_notification());
+                () => this._show_idle_notification(),
+                "start idle");
         }
     }
 
@@ -140,7 +140,7 @@ class NotificationStateMachine {
     destroy() {
         this._notification_source?.destroy()
         this._notification_source = null;
-        this._stop_idle?.();
+        this.nag_notification_interval?.();
         this._dispose_notification();
     }
 }

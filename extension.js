@@ -32,7 +32,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import { NotificationStateMachine } from './ui/notification_state_machine.js';
 import { between, Duration } from './date/duration.js';
 import { debug } from './utils/log.js';
-import { destroy as destroy_timers } from './utils/utils.js';
+import { destroy as destroy_timers, managedTimer, interval } from './utils/utils.js';
 
 const Indicator = GObject.registerClass(
     class Indicator extends PanelMenu.Button {
@@ -55,16 +55,9 @@ const Indicator = GObject.registerClass(
             this.menu.connect("open-state-changed", this.updateUI.bind(this))
             this.dbus_service = new TempomateService(this.fetch_and_start_or_continue_work.bind(this));
 
+            this.update_label_interval = interval(Duration.ofSeconds(60), Duration.ofSeconds(60), () => this.update_label(), "update label");
 
-            this._timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 60, () => {
-                this.update_label();
-                return GLib.SOURCE_CONTINUE;
-            });
-
-            this._filter_refresh_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 900, () => {
-                this._refreshFilters();
-                return GLib.SOURCE_CONTINUE;
-            });
+            this.issue_refresh_interval = interval(Duration.ofSeconds(900), Duration.ofSeconds(900), () => this._refreshFilters(), "refresh issues");
         }
 
         _restore() {
@@ -75,7 +68,7 @@ const Indicator = GObject.registerClass(
         }
 
         _settingsChanged() {
-            this.default_duration = this.settings.get_int("default-duration") * 60;
+            this.default_duration = Duration.ofSeconds(this.settings.get_int("default-duration") * 60);
             this.queries = this.settings.get_strv('jqls').map((s) => JSON.parse(s));
             this.client = jira_client_from_config(this.settings);
             this._work_journal = new WorkJournal(this.settings, () => this.client.tempo());
@@ -83,11 +76,8 @@ const Indicator = GObject.registerClass(
                 // set up stop timer if recent work has been restored
                 const remaining = between(new Date(), this._work_journal.current_work().end());
                 if (remaining.toSeconds() > 0) {
-                    this.stop_work_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, remaining.toSeconds(), () => {
-                        this.stop_work();
-                        this.stop_work_timeout = undefined;
-                        return GLib.SOURCE_REMOVE;
-                    });
+                    this.stop_work_timeout?.();
+                    this.stop_work_timeout = managedTimer(remaining, () => this.stop_work(), "stop work timeout (settings changed)");
                 }
             }
             this._refreshFilters();
@@ -199,15 +189,10 @@ const Indicator = GObject.registerClass(
             }
             debug("starting work " + issue.key)
             this.add_recent_issue(issue);
-            this._work_journal.start_work(issue.id, new Duration(this.default_duration * 1000), () => this.update_label());
-            if (this.stop_work_timeout) {
-                GLib.Source.remove(this.stop_work_timeout);
-            }
-            this.stop_work_timeout = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, this.default_duration, () => {
-                this.stop_work();
-                this.stop_work_timeout = undefined;
-                return GLib.SOURCE_REMOVE;
-            })
+            this._work_journal.start_work(issue.id, this.default_duration, () => this.update_label());
+
+            this.stop_work_timeout?.();
+            this.stop_work_timeout = managedTimer(this.default_duration, () => this.stop_work(), "stop work timeout (start work)");
         }
 
         // Add an issue to recent issues and update the UI
@@ -227,10 +212,7 @@ const Indicator = GObject.registerClass(
             debug("stopping work")
             this._notification_state_machine.stop_work();
 
-            if (this.stop_work_timeout) {
-                GLib.Source.remove(this.stop_work_timeout);
-                this.stop_work_timeout = null;
-            }
+            this.stop_work_timeout?.();
             this._work_journal.stop_work();
             this.update_label();
         }
@@ -273,20 +255,9 @@ const Indicator = GObject.registerClass(
 
         destroy() {
             this._save_state();
-            if (this.stop_work_timeout) {
-                GLib.Source.remove(this.stop_work_timeout);
-                this.stop_work_timeout = null;
-            }
-
-            if (this._timeout) {
-                GLib.Source.remove(this._timeout);
-                this._timeout = null;
-            }
-
-            if (this._filter_refresh_timeout) {
-                GLib.Source.remove(this._filter_refresh_timeout);
-                this._filter_timeout = null;
-            }
+            this.stop_work_timeout?.();
+            this.update_label_interval?.();
+            this.issue_refresh_interval?.();
 
             this._notification_state_machine.destroy();
             this._work_journal?.destroy();
@@ -314,8 +285,10 @@ export default class TempomateExtension extends Extension {
     }
 
     disable() {
+        debug("disabling tempomate");
         this._indicator?.destroy();
         this._indicator = null;
         destroy_timers();
+        debug("tempomate disabled");
     }
 }

@@ -22,6 +22,10 @@ class Duration {
     static ofSeconds(seconds) {
         return new Duration(seconds * 1000);
     }
+
+    static ofMillis(millis) {
+        return new Duration(millis);
+    }
 }
 
 function between(from, to) {
