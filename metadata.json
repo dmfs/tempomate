@@ -3,7 +3,7 @@
   "description": "Effortless time tracking in Jira Tempo timesheets!\n\nWith this extension, logging your time in Tempo takes three clicks or less—quick, simple, and hassle-free. Plus, if you forget, it sends friendly reminders to keep you on track. Just set it up with your Jira URL, username, API token, and a few JQL filters for the issue categories you want to see in the menu. Say goodbye to tedious time tracking and hello to streamlined productivity!",
   "uuid": "tempomate@dmfs.org",
   "shell-version": [
-    "46", "47"
+    "46", "47", "48", "49"
   ],
   "version-name": "0.8.1",
   "donations": {

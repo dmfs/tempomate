@@ -86,6 +86,31 @@
             <description>The interval in seconds at which to show the nag notifications when
                 enabled.</description>
         </key>
+        <key name="nag-notification-sound" type="b">
+            <default>false</default>
+            <summary>Nag Notification Sound</summary>
+            <description>Play a knock sound when showing nag notifications</description>
+        </key>
+        <key name="auto-stop-enabled" type="b">
+            <default>false</default>
+            <summary>Auto-stop timer</summary>
+            <description>Automatically stop work after the default duration has elapsed</description>
+        </key>
+        <key name="work-hours-start" type="i">
+            <default>9</default>
+            <summary>Working hours start</summary>
+            <description>Hour of the day when working hours begin (0-23)</description>
+        </key>
+        <key name="work-hours-end" type="i">
+            <default>17</default>
+            <summary>Working hours end</summary>
+            <description>Hour of the day when working hours end (0-23)</description>
+        </key>
+        <key name="work-days" type="as">
+            <default>["1","2","3","4","5"]</default>
+            <summary>Working days</summary>
+            <description>Days of the week when nag notifications are active (0=Sunday, 1=Monday, ..., 6=Saturday)</description>
+        </key>
         <key name="most-recent-work-log" type="s">
             <default>"null"</default>
             <summary>Most recent work-log</summary>

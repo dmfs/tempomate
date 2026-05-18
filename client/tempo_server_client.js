@@ -36,6 +36,8 @@ class TempoServerClient {
                 debug("create worklog response ", JSON.stringify(response));
                 if (Array.isArray(response) && response.length > 0) {
                     callback?.(fromTempo(response[0]));
+                } else if (response) {
+                    callback?.(fromTempo(response));
                 } else {
                     callback?.()
                 }

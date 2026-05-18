@@ -1,5 +1,14 @@
 /* Add your custom extension styling here */
 
+.popup-menu-content {
+    padding-left: 12px;
+}
+
+.popup-separator-menu-item {
+    margin-top: 8px;
+    margin-bottom: 4px;
+}
+
 .issue_label {
     font-weight: bold;
     padding-right: 1ex;

@@ -26,10 +26,10 @@ By default, the extension only shows open issues assigned to you. You can add mo
 
 ### Time tracking settings
 
-Once configured, you can track your time by clicking on the issue you're currently working on. Tempomate automatically
-adds a worklog with the configured duration to Tempo (default 1 hour). If the previous worklog entry stopped just a
-couple of minutes before, Tempomate can close the gap by moving the start of the new worklog back to the end of the
-previous one.
+Once configured, you can track your time by clicking on the issue you're currently working on. Tempomate starts
+a worklog that continues until you manually stop it or switch to another issue. If the previous worklog entry stopped
+just a couple of minutes before, Tempomate can close the gap by moving the start of the new worklog back to the end of
+the previous one.
 
 ![time tracking](https://github.com/dmfs/tempomate/blob/main/screenshots/time-tracking.png?raw=true)
 
@@ -42,7 +42,7 @@ Tempomate can remind you frequently to log your time if there is no current work
 ## Using Tempomate
 
 After configuring Tempomate, you can open the menu in the top right corner and click on the issue you're working on.
-Tempomate automatically adds a worklog with the configured duration.
+Tempomate starts a worklog that continues until you manually stop it or switch to another issue.
 
 ![popup](https://github.com/dmfs/tempomate/blob/main/screenshots/popup.png?raw=true)
 

@@ -1,5 +1,6 @@
 import GObject from 'gi://GObject';
 import Adw from 'gi://Adw';
+import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk';
 
 export var TrackingSettingsPage = GObject.registerClass({
@@ -30,6 +31,12 @@ export var TrackingSettingsPage = GObject.registerClass({
             duration_row.connect('unmap', (widget) => settings.set_int("default-duration", widget.value));
             group.add(duration_row);
 
+            const auto_stop_row = new Adw.SwitchRow({
+                title: "Auto-stop timer",
+                subtitle: "Automatically stop tracking after the worklog duration elapses"
+            });
+            settings.bind('auto-stop-enabled', auto_stop_row, 'active', Gio.SettingsBindFlags.DEFAULT);
+            group.add(auto_stop_row);
 
             const auto_close_gap_row = new Adw.SpinRow({
                 title: "Maximum Gap to Close",

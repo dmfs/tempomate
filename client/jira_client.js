@@ -3,20 +3,35 @@ import { RestClient } from './rest_client.js';
 import { TempoServerClient } from './tempo_server_client.js';
 import { TempoCloudClient } from './tempo_cloud_client.js';
 
+function normalizePickerResponse(response) {
+    return (response.sections ?? [])
+        .flatMap(section => section.issues ?? [])
+        .map(issue => ({ id: issue.id, key: issue.key, fields: { summary: issue.summaryText } }));
+}
+
 function jira_client_from_config(settings) {
-    switch (settings.get_string("deployment-type")) {
+    const deploymentType = settings.get_string("deployment-type");
+    console.log(`tempomate: deployment-type = ${deploymentType}`);
+    switch (deploymentType) {
         case "jira-server":
+            const host = settings.get_string("host");
+            console.log(`tempomate: jira-server host = ${host}`);
             return new JiraServerClient(
-                new RestClient(settings.get_string("host")),
+                new RestClient(host),
                 settings.get_string("username"),
                 settings.get_string("token")
             );
         case "jira-cloud":
+            const cloudHost = settings.get_string("jira-cloud-host");
+            console.log(`tempomate: jira-cloud host = ${cloudHost}`);
             return new JiraCloudClient(
-                new RestClient(settings.get_string("jira-cloud-host")),
+                new RestClient(cloudHost),
                 settings.get_string("jira-cloud-username"),
                 settings.get_string("jira-cloud-token"),
                 settings.get_string("tempo-cloud-token"));
+        default:
+            console.error(`tempomate: Unknown deployment-type: ${deploymentType}`);
+            return null;
     }
 }
 
@@ -28,17 +43,29 @@ class JiraServerClient {
     }
 
     issue(issue, response_handler, error_handler) {
-        this.rest_client.get(`/rest/api/2/issue/${encodeURI(issue)}?fields=id,key,summary`,
+        console.log(`tempomate: Fetching issue ${issue}`);
+        this.rest_client.get(`/rest/api/3/issue/${encodeURI(issue)}?fields=id,key,summary`,
+            [["Authorization", `Bearer ${this.token}`]])
+            .then(response_handler)
+            .catch(e => {
+                console.error(`tempomate: Failed to fetch issue ${issue}:`, e.message);
+                error_handler?.(e);
+            });
+    }
+
+    filter(jql, response_handler, error_handler) {
+        this.rest_client.get(
+            `/rest/api/3/search?jql=${encodeURI(jql)}&maxResults=30&fields=id,key,summary`,
             [["Authorization", `Bearer ${this.token}`]])
             .then(response_handler)
             .catch(error_handler);
     }
 
-    filter(jql, response_handler, error_handler) {
+    search(query, response_handler, error_handler) {
         this.rest_client.get(
-            `/rest/api/2/search?jql=${encodeURI(jql)}&maxResults=30&fields=id,key,summary`,
+            `/rest/api/3/issue/picker?query=${encodeURI(query)}&showSubTasks=true`,
             [["Authorization", `Bearer ${this.token}`]])
-            .then(response_handler)
+            .then(response => response_handler(normalizePickerResponse(response)))
             .catch(error_handler);
     }
 
@@ -56,19 +83,30 @@ class JiraCloudClient {
     }
 
     issue(issue, response_handler, error_handler) {
-        // TODO: use API V3
-        this.rest_client.get(`/rest/api/2/issue/${encodeURI(issue)}?fields=id,key,summary`,
+        console.log(`tempomate: Fetching issue ${issue} (cloud)`);
+        this.rest_client.get(`/rest/api/3/issue/${encodeURI(issue)}?fields=id,key,summary`,
             [["Authorization", `Basic ${this._base64(this.username, this.token)}`]])
+            .then(response_handler)
+            .catch(e => {
+                console.error(`tempomate: Failed to fetch issue ${issue} (cloud):`, e.message);
+                error_handler?.(e);
+            });
+    }
+
+    filter(jql, response_handler, error_handler) {
+        this.rest_client.post(
+            `/rest/api/3/search/jql`,
+            [["Authorization", `Basic ${this._base64(this.username, this.token)}`]],
+            { jql: jql, maxResults: 30, fields: ["id", "key", "summary"] })
             .then(response_handler)
             .catch(error_handler);
     }
 
-    filter(jql, response_handler, error_handler) {
-        // TODO: use API V3
+    search(query, response_handler, error_handler) {
         this.rest_client.get(
-            `/rest/api/2/search?jql=${encodeURI(jql)}&maxResults=30&fields=id,key,summary`,
+            `/rest/api/3/issue/picker?query=${encodeURI(query)}&showSubTasks=true`,
             [["Authorization", `Basic ${this._base64(this.username, this.token)}`]])
-            .then(response_handler)
+            .then(response => response_handler(normalizePickerResponse(response)))
             .catch(error_handler);
     }
 

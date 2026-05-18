@@ -15,7 +15,7 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
+import { Extension, gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import GObject from 'gi://GObject';
 import St from 'gi://St';
@@ -48,8 +48,14 @@ const Indicator = GObject.registerClass(
             this.setMenu(new PopupMenu.PopupMenu(this, 0.0, St.Side.TOP, 0));
             this.settings = settings;
             this._notification_state_machine = new NotificationStateMachine();
+            this._searchCache = new Map();
             this._restore()
-            this._settingsChangedId = this.settings.connect('changed', this._settingsChanged.bind(this));
+            this._settingsChangedId = this.settings.connect('changed', (settings, key) => {
+                if (key === 'most-recent-work-log' || key === 'issue-cache' || key === 'recent-issues') {
+                    return;
+                }
+                this._settingsChanged();
+            });
             this._settingsChanged();
 
             this.menu.connect("open-state-changed", this.updateUI.bind(this))
@@ -69,16 +75,25 @@ const Indicator = GObject.registerClass(
 
         _settingsChanged() {
             this.default_duration = Duration.ofSeconds(this.settings.get_int("default-duration") * 60);
+            this.auto_stop_enabled = this.settings.get_boolean("auto-stop-enabled");
             this.queries = this.settings.get_strv('jqls').map((s) => JSON.parse(s));
             this.client = jira_client_from_config(this.settings);
-            this._work_journal = new WorkJournal(this.settings, () => this.client.tempo());
+            this._searchCache.clear();
+            this._work_journal = new WorkJournal(this.settings, () => this.client.tempo(), error => this._on_worklog_error(error));
             if (this._work_journal.current_work()) {
-                // set up stop timer if recent work has been restored
-                const remaining = between(new Date(), this._work_journal.current_work().end());
-                if (remaining.toSeconds() > 0) {
-                    this.stop_work_timeout?.();
-                    this.stop_work_timeout = managedTimer(remaining, () => this.stop_work(), "stop work timeout (settings changed)");
+                this.stop_work_timeout?.();
+                if (this.auto_stop_enabled) {
+                    const remaining = between(new Date(), this._work_journal.current_work().end());
+                    if (remaining.toSeconds() > 0) {
+                        this.stop_work_timeout = managedTimer(remaining, () => this.stop_work(), "stop work timeout (settings changed)");
+                    }
                 }
+                if (!this.sync_work_interval) {
+                    this.sync_work_interval = interval(Duration.ofSeconds(300), Duration.ofSeconds(300), () => this._work_journal.sync_work(), "sync worklog");
+                }
+            } else {
+                this.sync_work_interval?.();
+                this.sync_work_interval = null;
             }
             this._refreshFilters();
             this.update_label();
@@ -86,11 +101,16 @@ const Indicator = GObject.registerClass(
 
             this._notification_state_machine.update_settings({
                 idle_notifications: this.settings.get_boolean("nag-notifications"),
-                idle_notification_interval: this.settings.get_int("nag-notification-interval")
+                idle_notification_interval: this.settings.get_int("nag-notification-interval"),
+                nag_notification_sound: this.settings.get_boolean("nag-notification-sound"),
+                work_hours_start: this.settings.get_int("work-hours-start"),
+                work_hours_end: this.settings.get_int("work-hours-end"),
+                work_days: this.settings.get_strv("work-days")
             })
         }
 
         updateUI(menu, opened) {
+            this._cancelSearchTimer?.();
             if (!opened || !this._work_journal) {
                 return;
             }
@@ -165,6 +185,53 @@ const Indicator = GObject.registerClass(
                 }
             })
             this.menu.addMenuItem(editableMenuItem);
+
+            const searchResultsSection = new PopupMenu.PopupMenuSection();
+            this.menu.addMenuItem(searchResultsSection);
+
+            editableMenuItem.entry.get_clutter_text().connect('text-changed', () => {
+                this._cancelSearchTimer?.();
+                const query = editableMenuItem.entry.text.trim();
+                if (query.length < 2) {
+                    searchResultsSection.removeAll();
+                    return;
+                }
+                const cached = this._searchCache.get(query.toLowerCase());
+                if (cached && (Date.now() - cached.timestamp) < 300000) {
+                    this._populateSearchResults(searchResultsSection, cached.issues);
+                    return;
+                }
+                this._cancelSearchTimer = managedTimer(Duration.ofMillis(300), () => {
+                    this.client.search(query,
+                        issues => {
+                            this._searchCache.set(query.toLowerCase(), { issues, timestamp: Date.now() });
+                            this._evictSearchCache();
+                            this._populateSearchResults(searchResultsSection, issues);
+                        },
+                        error => {
+                            debug("Search failed:", error?.message);
+                            editableMenuItem.set_error?.("Search failed");
+                        });
+                }, "search debounce");
+            });
+        }
+
+        _populateSearchResults(section, issues) {
+            section.removeAll();
+            for (const issue of issues) {
+                section.addMenuItem(this.generateMenuItem(issue));
+            }
+        }
+
+        _evictSearchCache() {
+            if (this._searchCache.size <= 50) {
+                return;
+            }
+            const oldest = [...this._searchCache.entries()]
+                .sort((a, b) => a[1].timestamp - b[1].timestamp)[0];
+            if (oldest) {
+                this._searchCache.delete(oldest[0]);
+            }
         }
 
         generateMenuItem(issue, ...actions) {
@@ -174,6 +241,11 @@ const Indicator = GObject.registerClass(
         }
 
         fetch_and_start_or_continue_work(issueKey, success_handler, error_handler) {
+            if (!this.client) {
+                console.error('tempomate: client is null - check deployment-type setting');
+                error_handler?.(new Error('Client not configured'));
+                return;
+            }
             this.client.issue(issueKey,
                 jira_issue => {
                     success_handler?.(jira_issue);
@@ -189,10 +261,17 @@ const Indicator = GObject.registerClass(
             }
             debug("starting work " + issue.key)
             this.add_recent_issue(issue);
-            this._work_journal.start_work(issue.id, this.default_duration, () => this.update_label());
+            this._work_journal.start_work(issue.id, Duration.ofSeconds(60), () => this.update_label());
+            this.update_label();
 
             this.stop_work_timeout?.();
-            this.stop_work_timeout = managedTimer(this.default_duration, () => this.stop_work(), "stop work timeout (start work)");
+            if (this.auto_stop_enabled) {
+                this.stop_work_timeout = managedTimer(this.default_duration, () => this.stop_work(), "stop work timeout (start work)");
+            }
+
+            if (!this.sync_work_interval) {
+                this.sync_work_interval = interval(Duration.ofSeconds(300), Duration.ofSeconds(300), () => this._work_journal.sync_work(), "sync worklog");
+            }
         }
 
         // Add an issue to recent issues and update the UI
@@ -213,6 +292,8 @@ const Indicator = GObject.registerClass(
             this._notification_state_machine.stop_work();
 
             this.stop_work_timeout?.();
+            this.sync_work_interval?.();
+            this.sync_work_interval = null;
             this._work_journal.stop_work();
             this.update_label();
         }
@@ -221,9 +302,9 @@ const Indicator = GObject.registerClass(
             const current_work = this._work_journal?.current_work();
             if (current_work) {
                 const issue = this.issue_of(current_work);
-                const remaining_duration = between(new Date(), current_work.end());
-                this.label.set_text(`${issue.key} (${remaining_duration.toMinutes()}m remaining)`);
-                this._notification_state_machine.start_work(issue, `${remaining_duration.toMinutes()} minutes remaining`);
+                const elapsed_duration = between(current_work.start(), new Date());
+                this.label.set_text(`🔨 ${issue.key} (${elapsed_duration.toMinutes()}m)`);
+                this._notification_state_machine.start_work(issue, `${elapsed_duration.toMinutes()} minutes`);
             } else {
                 this.label.set_text("⚠️ Not working on an issue ⚠️");
             }
@@ -247,6 +328,18 @@ const Indicator = GObject.registerClass(
             })
         }
 
+        _on_worklog_error(error) {
+            if (error.status_code === 401) {
+                this._notification_state_machine.show_error(
+                    "Tempomate: Authentication failed",
+                    "Your Tempo API token is invalid or expired. Please update it in the extension settings.");
+            } else {
+                this._notification_state_machine.show_error(
+                    "Tempomate: Failed to save worklog",
+                    `${error.message}`);
+            }
+        }
+
         _refreshFilters() {
             for (const q in this.queries) {
                 this.client.filter(this.queries[q].jql, (result) => this.issues[this.queries[q].name] = result.issues)
@@ -255,7 +348,9 @@ const Indicator = GObject.registerClass(
 
         destroy() {
             this._save_state();
+            this._cancelSearchTimer?.();
             this.stop_work_timeout?.();
+            this.sync_work_interval?.();
             this.update_label_interval?.();
             this.issue_refresh_interval?.();
 

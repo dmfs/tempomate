@@ -1,9 +1,13 @@
+import GLib from 'gi://GLib';
+
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
 import { addDuration, secondsFromNow } from '../date/date.js';
 import { interval } from '../utils/utils.js';
 import { between, Duration } from '../date/duration.js';
+
+const SOUND_FILE = GLib.build_filenamev([GLib.path_get_dirname(GLib.filename_from_uri(import.meta.url)[0]), '..', 'sounds', 'knock.ogg']);
 
 class NotificationStateMachine {
 
@@ -88,7 +92,33 @@ class NotificationStateMachine {
     }
 
 
+    _is_within_working_hours() {
+        if (!this._settings.work_days || this._settings.work_hours_start === undefined) {
+            return true;
+        }
+        const now = new Date();
+        const current_day = String(now.getDay());
+        const current_hour = now.getHours();
+
+        if (!this._settings.work_days.includes(current_day)) {
+            return false;
+        }
+
+        const start = this._settings.work_hours_start;
+        const end = this._settings.work_hours_end;
+
+        if (start <= end) {
+            return current_hour >= start && current_hour < end;
+        } else {
+            // overnight range, e.g. 22-6
+            return current_hour >= start || current_hour < end;
+        }
+    }
+
     _show_idle_notification() {
+        if (!this._is_within_working_hours()) {
+            return;
+        }
         this._dispose_notification();
 
         this._notification = new MessageTray.Notification({
@@ -103,6 +133,14 @@ class NotificationStateMachine {
         });
 
         this._ensure_notification_source().addNotification(this._notification);
+
+        if (this._settings.nag_notification_sound) {
+            try {
+                GLib.spawn_command_line_async(`paplay ${GLib.shell_quote(SOUND_FILE)}`);
+            } catch (e) {
+                // sound playback is best-effort
+            }
+        }
     }
 
     _start_idle() {
@@ -136,6 +174,17 @@ class NotificationStateMachine {
         return this._notification_source;
     }
 
+
+    show_error(title, body) {
+        const notification = new MessageTray.Notification({
+            source: this._ensure_notification_source(),
+            title: title,
+            body: body,
+            'is-transient': false,
+            urgency: MessageTray.Urgency.CRITICAL
+        });
+        this._ensure_notification_source().addNotification(notification);
+    }
 
     destroy() {
         this._notification_source?.destroy()
